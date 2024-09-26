@@ -47,8 +47,6 @@ def rasterize_satellite_images(out_pathname, LMA_pathname, sen2_pathname,
 
     sen2_ds_reprojected = sen2_clipped.rio.reproject_match(LMA_ds, resampling=interp_method)
 
-
-    # Export to file
     sen2_ds_reprojected.rio.to_raster(out_pathname)
     return
 
