@@ -10,11 +10,6 @@ import gc
 from sklearn.model_selection import train_test_split
 import argparse
 
-nodata_value = {
-    'sen2': 0,
-    'lma': 255
-}
-
 
 def get_padding_offset(image_width, image_height, patch_width, patch_height):
     '''
@@ -35,12 +30,12 @@ def get_padding_offset(image_width, image_height, patch_width, patch_height):
 
     return (top_padding, bottom_padding, left_padding, right_padding)
 
-def pad_image(image, sen2_or_lma, top_padding, bottom_padding, left_padding, right_padding):
+def pad_image(image, top_padding, bottom_padding, left_padding, right_padding):
 
     new_image = np.pad(image,
                        pad_width=((0, 0), (top_padding, bottom_padding), (left_padding, right_padding)),
                        mode='constant',
-                       constant_values=nodata_value[sen2_or_lma])
+                       constant_values=0)
 
     return new_image
 
@@ -79,7 +74,6 @@ def is_positive_or_negative_or_multiband(patch, is_source_multiband_or_label):
 #this function defines the naming convention of all kinds of patches
 def name_patch(patch, source_raster_name, current_patch_offset):
 
-    #area_of_interest, sen2_or_lma, pre_or_post, gsd_in_meters, multiband_or_label = re.split('_', source_raster_name)[:-1] #I don't want the .tif part
     area_of_interest, sen2_or_lma, pre_or_post, gsd_in_centimeters, multiband_or_label = source_raster_name.stem.split('_')
     positivelabel_or_negativelabel_or_multiband = is_positive_or_negative_or_multiband(patch, multiband_or_label)
     name = f'{area_of_interest}_{sen2_or_lma}_{pre_or_post}_{gsd_in_centimeters}_{positivelabel_or_negativelabel_or_multiband}_{current_patch_offset}.tif'
@@ -93,8 +87,7 @@ def crop(image, i, j, patch_width, patch_height):
 
 
 def possibly_extend_nodata_patches_list(patch, patch_name, list_of_nodata_patchnames):
-    sen2_or_lma = 'sen2' if 'sen2' in patch_name else 'lma'
-    if ('multiband' in patch_name) and np.all(patch == nodata_value[sen2_or_lma]):
+    if ('multiband' in patch_name) and np.all(patch == 0):
         extended_list = np.append(list_of_nodata_patchnames, patch_name)
     else:
         extended_list = list_of_nodata_patchnames
@@ -112,15 +105,12 @@ def export_patches(source_folder, base_out_path, patch_width=128, patch_height=1
         initial_transformation = hdd_image.transform
 
         source_raster_name = hdd_image.name
-
-        sen2_or_lma = 'sen2' if 'sen2' in source_raster_name else 'lma'
-
         top_pad, bottom_pad, left_pad, right_pad = get_padding_offset(hdd_image.width, hdd_image.height, patch_width, patch_height)
         crop_grid = generate_grid(hdd_image.width, hdd_image.height, patch_width, patch_height, top_pad, bottom_pad, left_pad, right_pad)
         number_of_patches = len(crop_grid)
 
         ram_image = hdd_image.read()
-        padded_image = pad_image(ram_image, sen2_or_lma, top_pad, bottom_pad, left_pad, right_pad)
+        padded_image = pad_image(ram_image, top_pad, bottom_pad, left_pad, right_pad)
         padded_image_transformation = retransform(initial_transformation, -left_pad,-top_pad) #negative here because I want the origin to move up and left
         patch_key = 0
 
