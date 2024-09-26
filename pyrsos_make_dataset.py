@@ -1,3 +1,4 @@
+#!/usr/bin/python3
 from enum import unique
 import numpy as np
 import rasterio
@@ -208,15 +209,15 @@ def make_patchpaths_table(search_path):
     return table
 
 
-def split_dataset(base_out_path, train_percentage, test_percentage, optional_prefix):
+def split_dataset(base_out_path, train_percentage, test_percentage, optional_prefix, seed):
     main_percentage = 100 - test_percentage
     val_percentage = main_percentage - train_percentage
 
     all_files = make_patchpaths_table(base_out_path/'patches')
     adhoc_labels_list = [0]*len(all_files)
-    main_set, test_set, _, _ = train_test_split(all_files, adhoc_labels_list, train_size=main_percentage/100, test_size=test_percentage/100, random_state=42)
+    main_set, test_set, _, _ = train_test_split(all_files, adhoc_labels_list, train_size=main_percentage/100, test_size=test_percentage/100, random_state=seed)
     adhoc_labels_list = [0]*len(main_set)
-    training_set, validation_set, _, _ = train_test_split(main_set, adhoc_labels_list, train_size=train_percentage/100, test_size=val_percentage/100, random_state=42)
+    training_set, validation_set, _, _ = train_test_split(main_set, adhoc_labels_list, train_size=train_percentage/100, test_size=val_percentage/100, random_state=seed)
 
     train_pickle_name = f'allEvents_{train_percentage}_{val_percentage}_{test_percentage}_{optional_prefix}_train.pkl'
     val_pickle_name = f'allEvents_{train_percentage}_{val_percentage}_{test_percentage}_{optional_prefix}_val.pkl'
@@ -227,26 +228,51 @@ def split_dataset(base_out_path, train_percentage, test_percentage, optional_pre
     pickle.dump(test_set, open(base_out_path/test_pickle_name, 'wb'))
 
 
-    return (training_set, validation_set, test_set)
-
-tr,val,tst = split_dataset(base_out_path, 60, 20, 'v1')
+    return
 
 
-if __name__ == 'main':
-    parser = argparse.ArgumentParser(description='This program works in two phases.\
-    In phase 1: All raster images are split into equally sized patches.\
-    In phase_2: Three pickle files are created, each containing mutually exclusive paths to the patches\
-    and representing different stages in the learning pipeline.')
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='This program works in 3 modes.\
+    In mode 1: All raster images are split into equally sized patches.\
+    In mode 2: Three pickle files are created, each containing mutually exclusive paths to the patches\
+    and representing different stages in the learning pipeline.\
+    Mode 3: It is mode 1 followed by mode 2. This is the default mode')
 
-    parser.add_argument('dataset_path', default='pyrsos_250cm_dataset')
-    parser.add_argument('base_out_bath', default='destination')
-    parser.add_argument('patch_width', type=int, default=128)
-    parser.add_argument('patch_height', type=int, default=128)
+    parser.add_argument('--dataset_path', type=Path, default='/mnt/7EBA48EEBA48A48D/examhno10/ptyhiakh/pyrsos/pyrsos_250cm_dataset')
+    parser.add_argument('--base_out_path', type=Path, default='/mnt/7EBA48EEBA48A48D/examhno10/ptyhiakh/pyrsos/destination')
+    parser.add_argument('--patch_width', type=int, default=128)
+    parser.add_argument('--patch_height', type=int, default=128)
+    parser.add_argument('--prefix', type=str, default='v1')
+    parser.add_argument('--seed', type=int, default=29)
+    parser.add_argument('--mode', type=int, default=3)
+    parser.add_argument('--train_percentage', type=int, default=60)
+    parser.add_argument('--test_percentage', type=int, default=20)
+    args = parser.parse_args()
 
-    args= parser.parse_args()
-    empty_multiband_patches = export_patches(args.,
-                                         base_out_path,
-                                         1024,
-                                         1024)
+    if args.mode == 1:
+        args.base_out_path.mkdir(parents=True, exist_ok=True)
+        patches_path = args.base_out_path/ 'patches'
+        patches_path.mkdir(parents=True, exist_ok=True)
 
-    remove_empty_patches_and_their_labels(empty_multiband_patches, base_out_path)
+        empty_multiband_patches = export_patches(args.dataset_path,
+                                                 args.base_out_path,
+                                                 args.patch_width,
+                                                 args.patch_height)
+
+        remove_empty_patches_and_their_labels(empty_multiband_patches, args.base_out_path)
+
+    if args.mode == 2:
+        split_dataset(args.base_out_path, args.train_percentage, args.test_percentage, args.prefix, args.seed)
+
+    if args.mode == 3:
+        args.base_out_path.mkdir(parents=True, exist_ok=True)
+        patches_path = args.base_out_path/ 'patches'
+        patches_path.mkdir(parents=True, exist_ok=True)
+
+        empty_multiband_patches = export_patches(args.dataset_path,
+                                                 args.base_out_path,
+                                                 args.patch_width,
+                                                 args.patch_height)
+
+        remove_empty_patches_and_their_labels(empty_multiband_patches, args.base_out_path)
+        split_dataset(args.base_out_path, args.train_percentage, args.test_percentage, args.prefix, args.seed)
