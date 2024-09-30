@@ -17,7 +17,7 @@ def open_sentinel2(sen2_path, sen2_gsd):
         current_band_name = img_file.stem.split('_')[-2] #this is consistent with the granule naming convention
         current_band_data = rxr.open_rasterio(img_file)
         band_names.append(current_band_name)
-        band_arrays.append(current_band_data.squeeze())
+        band_arrays.append(current_band_data)
 
     sen2_ds = xr.concat(band_arrays, dim='band')
     sen2_ds['band'] = band_names
@@ -74,4 +74,5 @@ if __name__ == '__main__':
 
     final_sen2_ds = realligned_sen2_ds
     final_sen2_ds.values = realligned_sen2_bands_with_black_pixels
+    final_sen2_ds.attrs['band names'] = realligned_sen2_ds.band
     final_sen2_ds.rio.to_raster(args.out_path)
