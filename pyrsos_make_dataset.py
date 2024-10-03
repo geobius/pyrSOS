@@ -7,9 +7,8 @@ import pickle
 from pathlib import Path
 from itertools import product, starmap
 import gc
-from sklearn.model_selection import train_test_split
 import argparse
-
+import random
 
 def get_padding_offset(image_width, image_height, patch_width, patch_height):
     '''
@@ -98,7 +97,7 @@ def possibly_extend_nodata_patches_list(patch, patch_name, list_of_nodata_patchn
 def export_patches(source_folder, base_out_path, patch_width=128, patch_height=128):
     #all patches are exported as tif files
     zero_patches = []
-    all_files = source_folder.glob('*')
+    all_files = source_folder.glob('*.tif')
 
     for current_file in all_files:
         hdd_image = rasterio.open(source_folder/current_file)
@@ -155,11 +154,6 @@ def remove_empty_patches_and_their_labels(empty_patch_names, base_out_path):
             print(f'removed {p} as empty area\n')
     return
 
-
-source_folder = Path('/mnt/7EBA48EEBA48A48D/examhno10/ptyhiakh/pyrsos/pyrsos_250cm_dataset')
-base_out_path = Path('/mnt/7EBA48EEBA48A48D/examhno10/ptyhiakh/pyrsos/destination')
-
-
 def find_paths_of_overlaying_patches(area, ID, search_path):
     lma = list(search_path.glob(f'{area}_lma_*_multiband_{ID}.tif'))[0]
     sen2_pre = list(search_path.glob(f'{area}_sen2_pre_*_{ID}.tif'))[0]
@@ -188,38 +182,48 @@ def unique_IDs(source_area_name, search_folder):
 
     return label_IDs
 
-def make_patchpaths_table(search_path):
-    areas_of_interest = ['domokos', 'prodromos', 'yliki', 'delphoi']
+def table_by_area(source_area_name, search_folder):
+    all_possible_IDs = unique_IDs(source_area_name, search_folder)
     table = []
-    for region in areas_of_interest:
-        IDs = unique_IDs(region, search_path)
-        for patch_ID in IDs:
-            table.append(find_paths_of_overlaying_patches(region, patch_ID, search_path))
+    for ID in all_possible_IDs:
+        table.append(find_paths_of_overlaying_patches(source_area_name, ID, search_folder))
 
     return table
 
+def split_events(all_events, seed):
+    random.seed(seed)
+    all_events = ['delphoi', 'domokos', 'prodromos', 'yliki']
+    main_events = random.sample(all_events, k=3)
+    test_events = [e for e in all_events if e not in main_events]
+    validation_events = random.choices(main_events, k=1)
+    training_events = [e for e in main_events if e not in validation_events]
+    return (training_events, validation_events, test_events)
 
-def split_dataset(base_out_path, train_percentage, test_percentage, optional_prefix, seed):
-    main_percentage = 100 - test_percentage
-    val_percentage = main_percentage - train_percentage
 
-    all_files = make_patchpaths_table(base_out_path/'patches')
-    adhoc_labels_list = [0]*len(all_files)
-    main_set, test_set, _, _ = train_test_split(all_files, adhoc_labels_list, train_size=main_percentage/100, test_size=test_percentage/100, random_state=seed)
-    adhoc_labels_list = [0]*len(main_set)
-    training_set, validation_set, _, _ = train_test_split(main_set, adhoc_labels_list, train_size=train_percentage/100, test_size=val_percentage/100, random_state=seed)
+def split_dataset(base_out_path, optional_prefix, seed):
+    all_events = ['delphoi', 'domokos', 'prodromos', 'yliki']
+    training_events, validation_events, test_events = split_events(all_events, seed)
 
-    train_pickle_name = f'allEvents_{train_percentage}_{val_percentage}_{test_percentage}_{optional_prefix}_train.pkl'
-    val_pickle_name = f'allEvents_{train_percentage}_{val_percentage}_{test_percentage}_{optional_prefix}_val.pkl'
-    test_pickle_name = f'allEvents_{train_percentage}_{val_percentage}_{test_percentage}_{optional_prefix}_test.pkl'
+    training_set = []
+    validation_set = []
+    testing_set = []
+
+    for e in training_events:
+        training_set.append(table_by_area(e, base_out_path/'patches'))
+    for e in validation_events:
+        validation_set.append(table_by_area(e, base_out_path/'patches'))
+    for e in training_events:
+        training_set.append(table_by_area(e, base_out_path/'patches'))
+
+    train_pickle_name = f'TrainEvents_{optional_prefix}.pkl'
+    val_pickle_name = f'ValidationEvents_{optional_prefix}.pkl'
+    test_pickle_name = f'TestingEvents_{optional_prefix}.pkl'
 
     pickle.dump(training_set, open(base_out_path/train_pickle_name, 'wb'))
     pickle.dump(validation_set, open(base_out_path/val_pickle_name, 'wb'))
-    pickle.dump(test_set, open(base_out_path/test_pickle_name, 'wb'))
-
+    pickle.dump(testing_set, open(base_out_path/test_pickle_name, 'wb'))
 
     return
-
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='This program works in 3 modes.\
@@ -252,7 +256,7 @@ if __name__ == '__main__':
         remove_empty_patches_and_their_labels(empty_multiband_patches, args.base_out_path)
 
     if args.mode == 2:
-        split_dataset(args.base_out_path, args.train_percentage, args.test_percentage, args.prefix, args.seed)
+        split_dataset(args.base_out_path, args.prefix, args.seed)
 
     if args.mode == 3:
         args.base_out_path.mkdir(parents=True, exist_ok=True)
@@ -265,4 +269,4 @@ if __name__ == '__main__':
                                                  args.patch_height)
 
         remove_empty_patches_and_their_labels(empty_multiband_patches, args.base_out_path)
-        split_dataset(args.base_out_path, args.train_percentage, args.test_percentage, args.prefix, args.seed)
+        split_dataset(args.base_out_path, args.prefix, args.seed)
