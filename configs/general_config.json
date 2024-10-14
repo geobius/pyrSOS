@@ -1,0 +1,45 @@
+{
+    "model": "bam_cd",
+    "learning_stage": "train",
+    "distributed?": false,
+    "#workers": 6,
+    "seed": 999,
+    "device": "cuda:0",
+
+    "#epochs": 200,
+    "#training_repetitions": 5,
+    "#validation_frequency": 1,
+    "save_checkpoint_frequency": -1,
+    "print_frequency": 5,
+    "mixed_precision?" : false,
+    "loss_function": "cross_entropy",
+    "weighted_loss?": false,
+    "resume_training_from_checkpoint?": false,
+
+    "wandb_project": "first trial",
+    "wandb_entity": "",
+    "wandb_id": "test1",
+    "wandb_resume?": false,
+    "wandb_activate?":false,
+
+    "dataset_path": "/mnt/7EBA48EEBA48A48D/examhno10/ptyhiakh/pyrsos/destination/",
+    "results_path": "/mnt/7EBA48EEBA48A48D/examhno10/ptyhiakh/pyrsos/results/",
+    "load_state_path": null,
+
+    "train": "TrainEvents_v1.pkl",
+    "val": "ValidationEvents_v1.pkl",
+    "test": "TestingEvents_v1.pkl",
+
+    "patch_width": 128,
+    "patch_height": 128,
+
+    "pre_data_source": "sen2",
+    "pre_normalize?": true,
+    "pre_gsd_meters": 2.5,
+    "pre_selected_bands": ["B03","B04","B06","B07"],
+
+    "post_data_source": "lma",
+    "post_normalize?": true,
+    "post_gsd_meters": 2.5,
+    "post_selected_bands": ["B01","B02","B03","B04"]
+}
