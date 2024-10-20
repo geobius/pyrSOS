@@ -9,7 +9,8 @@
     "#epochs": 200,
     "#training_repetitions": 5,
     "#validation_frequency": 1,
-    "save_checkpoint_frequency": -1,
+    "save_every_n_epochs": 5,
+    "save_last_epoch": 100,
     "print_frequency": 5,
     "mixed_precision?" : false,
     "loss_function": "cross_entropy",
@@ -33,13 +34,13 @@
     "patch_width": 128,
     "patch_height": 128,
 
-    "pre_data_source": "sen2",
+    "pre_data_source": "sen2_pre",
     "pre_normalize?": true,
     "pre_gsd_meters": 2.5,
-    "pre_selected_bands": ["B03","B04","B06","B07"],
+    "pre_selected_bands": [3,4,6,7],
 
-    "post_data_source": "lma",
+    "post_data_source": "lma", //lma or sen2_post
     "post_normalize?": true,
     "post_gsd_meters": 2.5,
-    "post_selected_bands": ["B01","B02","B03","B04"]
+    "post_selected_bands": [1,2,3,4]
 }
