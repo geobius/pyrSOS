@@ -8,9 +8,10 @@ from torch.utils import checkpoint
 from torchmetrics import MetricCollection
 from itertools import chain
 import rasterio as rio
-from torchmetrics.classification import MulticlassAccuracy, MulticlassF1Score, MulticlassJaccardIndex, MulticlassPrecision, MulticlassRecall
+from torchmetrics.segmentation import GeneralizedDiceScore, MeanIoU, mean_iou
+import wandb
 
-from config_parsers import font_colors
+from .config_parsers import font_colors
 
 from models.fc_ef_conc import FC_EF_conc
 from models.fc_ef_diff import FC_EF_diff
@@ -40,17 +41,13 @@ def save_checkpoint(checkpoint_path, loss, model, optimizer, lr_scheduler):
     return checkpoint_path
 
 def load_checkpoint(checkpoint_path):
-    if checkpoint_path.exists():
+
+    if checkpoint_path.is_file():
         state_dictionaries = torch.load(checkpoint_path)
         return state_dictionaries
     else:
         return {}
 
-def parse_epoch_from_checkpoint_filename(checkpoint_path):
-    epoch = 0
-    if checkpoint_path.exists():
-        epoch = int(checkpoint_path.stem.split('epoch =')[1]) + 1
-    return epoch
 
 def name_checkpoint(parent_folder, epoch):
     path = parent_folder / f'checkpoint_epoch={epoch}.pt'
@@ -60,23 +57,57 @@ def name_checkpoint(parent_folder, epoch):
 
 def init_new_checkpoints_folder(configs):
     checkpoints_path = None
-    if not (configs['resume_training_from_checkpoint']) and configs['learning_stage'] == 'test':
-        run_timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-        checkpoints_path = configs['results_path'] / configs['model'] / run_timestamp / 'checkpoints'
-        checkpoints_path.mkdir(exist_ok=True, parents=True)
+    run_timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+    checkpoints_path = Path(configs['results_path']) / configs['model'] / run_timestamp / 'checkpoints'
+    checkpoints_path.mkdir(exist_ok=True, parents=True)
 
     return checkpoints_path
 
-def init_epoch(configs):
-    epoch = 0
-    if
+def parse_epoch_from_checkpoint_filename(checkpoint_path):
+    epoch = int(checkpoint_path.stem.split('epoch =')[1]) + 1
+    return epoch
 
 
+def reset_or_continue(configs):
+    #return a path, a state dictionary and an epoch
 
-def init_model(configs, model_configs, checkpoint, inp_channels, device):
+    if configs['load_state_path'] is None:
+        checkpoints_folder = init_new_checkpoints_folder(configs)
+        state_dictionary = {}
+        starting_epoch = 0
+
+        return checkpoints_folder, state_dictionary, starting_epoch
+
+    checkpoint_path = Path(configs['load_state_path'])
+    if checkpoint_path.exists():
+        checkpoints_folder = checkpoint_path.parent
+        state_dictionary = load_checkpoint(checkpoint_path)
+        starting_epoch = parse_epoch_from_checkpoint_filename(checkpoint_path)
+
+        return checkpoints_folder, state_dictionary, starting_epoch
+
+    else:
+        Exception("""This file does not exist. If you want to start anew replace the
+        load_state_path json config with a none value. If you want to continue
+        from some checkpoint you must provide a valid path""")
+
+
+def init_wandb(configs, model_configs):
+    all_configs = configs
+    all_configs.update({'model_configs': model_configs})
+
+    if configs['wandb_activate?']:
+        wandb.init(project=configs['wandb_project'],
+                   config= all_configs,
+                   reinit=True)
+
+    return
+
+
+def init_model(model_name, model_configs, checkpoint, patch_width, inp_channels):
     '''initiate the appropriate model, send it to the device and load a state dictionary'''
     model = None
-    match configs['model']:
+    match model_name:
         case 'fc_ef_conc':
             model = FC_EF_conc(input_nbr=inp_channels, label_nbr=2)
         case 'fc_ef_diff':
@@ -88,7 +119,7 @@ def init_model(configs, model_configs, checkpoint, inp_channels, device):
         case 'snunet':
             model = SNUNet_ECAM(inp_channels, 2, base_channel=model_configs['base_channel'])
         case 'hfanet':
-            model = HFANet(input_channel=inp_channels, input_size=configs['patch_width'], num_classes=2)
+            model = HFANet(input_channel=inp_channels, input_size=patch_width, num_classes=2)
         case 'bit_cd':
             model = define_G(model_configs, num_classes=2, in_channels=inp_channels)
         case 'bam_cd':
@@ -110,7 +141,7 @@ def init_model(configs, model_configs, checkpoint, inp_channels, device):
                 decoder_softmax=model_configs['decoder_softmax'])
         case 'transunet_cd':
             model = TransUNet_CD(
-                img_dim=configs['patch_width'],
+                img_dim= patch_width,
                 in_channels=inp_channels,
                 out_channels=model_configs['out_channels'],
                 head_num=model_configs['head_num'],
@@ -120,8 +151,7 @@ def init_model(configs, model_configs, checkpoint, inp_channels, device):
                 class_num=2,
                 siamese=model_configs['siamese'])
 
-    model = model.module.to(device) if isinstance(model, nn.DataParallel) else model.to(device)
-    if checkpoint is not None:
+    if checkpoint != {}:
         model.load_state_dict(checkpoint['model_state_dict'])
 
     return model
@@ -132,7 +162,7 @@ def compute_class_weights(configs):
     Computes the number of pixels per class (burnt/unburnt), then computes the weights of each class
     based on these counts and returns the weights.
     '''
-    if configs['weighted_loss']:
+    if configs['weighted_loss?']:
         patch_width = configs['patch_width']
         patch_height = configs['patch_height']
 
@@ -140,16 +170,19 @@ def compute_class_weights(configs):
         unburnt = {'train': 0, 'val': 0, 'test': 0}
 
         for mode in ['train', 'val', 'test']:
-            pickle_path = Path(configs['dataset_path']) /configs[mode],
+            pickle_path = Path(configs['dataset_path']) / configs[mode]
             pickle_file = pickle.load(open(pickle_path, 'rb'))
-            all_patches_all_areas = chain(pickle_file.values)
+            merged_patches = [item for sublist in pickle_file.values() for item in sublist]
 
-            for patch in all_patches_all_areas:
-                if 'positive' in patch['label']:
-                    with rio.open(patch['label']):
-                        mask_band = rio.read(1).flatten()
-                        unburnt[mode] += sum(mask_band == 0) #count zeros
-                        burnt[mode] += patch_width * patch_height - unburnt #the amount of remaining pixels
+            for patch in merged_patches:
+                if 'positive' in patch['label'].stem:
+                    with rio.open(patch['label']) as label:
+                        mask_band = label.read(1).flatten()
+                        patch_unburnt = sum(mask_band == 0) #count zeros
+                        patch_burnt = patch_width * patch_height - patch_unburnt #the remaining pixels
+
+                        unburnt[mode] += patch_unburnt
+                        burnt[mode] += patch_burnt
 
                 else:
                     unburnt[mode] += (patch_width * patch_height)
@@ -173,11 +206,8 @@ def compute_class_weights(configs):
 def init_metrics():
 
     pyrsos_metrics = MetricCollection({
-        "accuracy": MulticlassAccuracy(num_classes=3, ignore_index=2, average=None),
-        "precision": MulticlassPrecision(num_classes=3, ignore_index=2, average=None),
-        "recall": MulticlassRecall(num_classes=3, ignore_index=2, average=None),
-        "f1": MulticlassF1Score(num_classes=3, ignore_index=2, average=None),
-        "iou": MulticlassJaccardIndex(num_classes=3, ignore_index=2, average=None)
+        "dice": GeneralizedDiceScore(num_classes=2, input_format='index', per_class=True),
+        "iou": MeanIoU(num_classes=2, input_format='index', per_class=True)
     })
 
     return pyrsos_metrics
@@ -185,36 +215,36 @@ def init_metrics():
 
 
 
-def init_loss(configs, mode, device, class_weights, model_configs):
+def init_loss(function_name, class_weights, model_configs):
 
-    match configs['loss_function']:
+    match function_name:
         case 'cross_entropy':
-            return nn.CrossEntropyLoss(weight=torch.Tensor(class_weights[mode]), ignore_index=2).to(device)
+            return nn.CrossEntropyLoss(weight=torch.Tensor(class_weights), ignore_index=2)
         case 'focal':
             return torch.hub.load(
                 'adeelh/pytorch-multi-class-focal-loss',
                 model='FocalLoss',
-                alpha=torch.Tensor(class_weights[mode]),
+                alpha=torch.Tensor(class_weights),
                 gamma=2,
                 reduction='mean',
                 force_reload=False,
-                ignore_index=2).to(device)
+                ignore_index=2)
         case 'dice':
             if ('activation' in model_configs.keys()) and (model_configs['activation'] is not None):
                 use_softmax = False
             else:
                 use_softmax = True
-            return DiceLoss(ignore_index=2, use_softmax=use_softmax).to(device)
+            return DiceLoss(ignore_index=2, use_softmax=use_softmax)
 
         case 'dice+ce':
             if ('activation' in model_configs.keys()) and (model_configs['activation'] is not None):
                 use_softmax = False
             else:
                 use_softmax = True
-            return BCEandDiceLoss(weights=torch.Tensor(class_weights[mode]), ignore_index=2, use_softmax=use_softmax).to(device)
+            return BCEandDiceLoss(weights=torch.Tensor(class_weights), ignore_index=2, use_softmax=use_softmax)
 
         case _:
-            raise NotImplementedError(f'Loss {configs["train"]["loss_function"]} is not implemented!')
+            raise NotImplementedError(f'Loss {function_name} is not implemented!')
 
 
 def init_optimizer(model, checkpoint, configs, model_configs, model_name=None):
@@ -238,7 +268,7 @@ def init_optimizer(model, checkpoint, configs, model_configs, model_name=None):
         raise NotImplementedError(f'Optimizer {optim_args["name"]} is not implemented!')
 
     # Load checkpoint (if any)
-    if checkpoint is not None:
+    if checkpoint != {}:
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
 
     return optimizer
@@ -291,8 +321,7 @@ def init_lr_scheduler(optimizer, checkpoint, configs, model_configs, model_name=
             raise NotImplementedError(f'{lr_schedule} LR scheduling is not yet implemented!')
 
     # Load checkpoint (if any)
-    if checkpoint is not None:
+    if checkpoint != {}:
         lr_scheduler.load_state_dict(checkpoint['lr_scheduler_state_dict'])
 
     return lr_scheduler
-

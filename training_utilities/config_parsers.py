@@ -43,10 +43,6 @@ def read_learning_configs(configs_path):
         f"""{font_colors.RED}Error: No valid learning_stage is provided.{font_colors.ENDC}
         A valid learning_stage must be one of the following {font_colors.BLUE}{valid_learning_stages}{font_colors.BLUE}"""
 
-    assert isinstance(configs['distributed?'], bool), \
-        f"""{font_colors.RED}Error: No valid distributed? is provided.{font_colors.ENDC}
-        A valid distributed value must be a boolean"""
-
     assert isinstance(configs['#workers'], int), \
         f"""{font_colors.RED}Error: #workers does not have a valid value.{font_colors.ENDC}
         A valid value must be an integer"""
@@ -55,12 +51,16 @@ def read_learning_configs(configs_path):
         f"""{font_colors.RED}Error: seed does not have a valid value.{font_colors.ENDC}
         A valid seed must be an integer"""
 
-    valid_devices = ['cpu', 'cuda:0']
+    valid_devices = ['cpu', 'cuda']
     assert configs['device'] in valid_devices, \
         f"""{font_colors.RED}Error: No valid device is provided.{font_colors.ENDC}
         A valid seed must be an integer"""
-    if configs['device'] == 'cuda:0' and not torch.cuda.is_available():
+    if configs['device'] == 'cuda' and not torch.cuda.is_available():
         raise Exception("cuda is not supported on this machine. You must change the value of 'device' to 'cpu' inside the configuration file.")
+
+    assert isinstance(configs['batch_size'], int), \
+        f"""{font_colors.RED}Error: batch_size does not have a valid value.{font_colors.ENDC}
+        A valid batch size must be an integer"""
 
     assert isinstance(configs['#epochs'], int), \
         f"""{font_colors.RED}Error: #epochs does not have a valid value.{font_colors.ENDC}
@@ -70,25 +70,12 @@ def read_learning_configs(configs_path):
         f"""{font_colors.RED}Error: #training_repetitions does not have a valid value.{font_colors.ENDC}
         A valid #training_repetitions value must be an integer"""
 
-    assert isinstance(configs['#validation_frequency'], int), \
-        f"""{font_colors.RED}Error: #validation_frequency does not have a valid value.{font_colors.ENDC}
-        A valid #validation_frequency value must be an integer"""
 
     assert isinstance(configs['save_every_n_epochs'], int), \
         f"""{font_colors.RED}Error: save_every_n_epochs does not have a valid value.{font_colors.ENDC}
         A valid save_every_n_epochs value must be an integer"""
 
-    assert isinstance(configs['save_last_epoch'], int), \
-        f"""{font_colors.RED}Error: save_last_epoch does not have a valid value.{font_colors.ENDC}
-        A valid save_last_epoch value must be an integer"""
 
-    assert isinstance(configs['print_frequency'], int), \
-        f"""{font_colors.RED}Error: print_frequency does not have a valid value.{font_colors.ENDC}
-        A valid print_frequency value must be an integer"""
-
-    assert isinstance(configs['mixed_precision?'], bool), \
-        f"""{font_colors.RED}Error: print_frequency does not have a valid value.{font_colors.ENDC}
-        A valid print_frequency value must be an integer"""
 
     valid_loss_functions = ["cross_entropy", "focal", "dice", "dice+ce"]
     assert configs['loss_function'] in valid_loss_functions, \
@@ -99,9 +86,6 @@ def read_learning_configs(configs_path):
         f"""{font_colors.RED}Error: weighted_loss? does not have a valid value.{font_colors.ENDC}
         A valid weighted_loss? value must be a bool"""
 
-    assert isinstance(configs['resume_training_from_checkpoint?'], bool), \
-        f"""{font_colors.RED}Error: resume_training_from_checkpoint? does not have a valid value.{font_colors.ENDC}
-        A valid resume_training_from_checkpoint? value must be a boolean"""
 
     assert isinstance(configs['wandb_project'], str), \
         f"""{font_colors.RED}Error: wandb_project does not have a valid value.{font_colors.ENDC}
@@ -134,7 +118,7 @@ def read_learning_configs(configs_path):
         f"""{font_colors.RED}{font_colors.BOLD}The checkpoint path ({configs['load_state_path']}) does not exist!{font_colors.ENDC}"""
 
 
-    ds_path = Path(configs['dataset_path'])
+    ds_path = Path(configs['patched_dataset_path'])
     assert (ds_path/configs['train']).exists(), \
         f"""cannot find the training pickle file in {ds_path}"""
 
