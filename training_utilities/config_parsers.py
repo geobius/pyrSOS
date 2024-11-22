@@ -118,7 +118,7 @@ def read_learning_configs(configs_path):
         f"""{font_colors.RED}{font_colors.BOLD}The checkpoint path ({configs['load_state_path']}) does not exist!{font_colors.ENDC}"""
 
 
-    ds_path = Path(configs['patched_dataset_path'])
+    ds_path = Path(configs['dataset_path'])
     assert (ds_path/configs['train']).exists(), \
         f"""cannot find the training pickle file in {ds_path}"""
 

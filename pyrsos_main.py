@@ -33,13 +33,13 @@ from training_utilities.initializers import (
     init_loss,
     init_wandb,
 )
-from training_utilities.dataloaders import Pyrsos_Dataset, create_dataloader_from_area
+from training_utilities.dataloaders import Pyrsos_Dataset, Burned_Area_Sampler
 from training_utilities.learning_loops import (
     train1epoch,
     eval1epoch,
     wandb_log_metrics
 )
-from training_utilities.prediction_visualization import predict_whole_mask
+#from training_utilities.prediction_visualization import predict_whole_mask
 
 
 parser = argparse.ArgumentParser()
@@ -71,7 +71,9 @@ train_dataset = Pyrsos_Dataset('train', configs)
 val_dataset = Pyrsos_Dataset('val', configs)
 test_dataset = Pyrsos_Dataset('test', configs)
 
-train_loader = DataLoader(train_dataset, num_workers=configs['#workers'], batch_size=configs['batch_size'], shuffle=True, pin_memory=True)
+train_sampler = Burned_Area_Sampler(train_dataset)
+
+train_loader = DataLoader(train_dataset, num_workers=configs['#workers'], batch_size=configs['batch_size'], sampler=train_sampler, pin_memory=True)
 val_loader = DataLoader(val_dataset, num_workers=configs['#workers'], batch_size=configs['batch_size'], shuffle=True, pin_memory=True)
 test_loader = DataLoader(test_dataset, num_workers=configs['#workers'], batch_size=configs['batch_size'], shuffle=True, pin_memory=True)
 
@@ -121,14 +123,16 @@ if configs['learning_stage'] == 'train':
 
 
 
-if configs['learning_stage'] == 'test':
-    model = init_model(model_name, model_configs, state_dictionaries, patch_width, number_of_channels).to(device=configs['device'])
-    wandb = init_wandb(configs, model_configs)
+if configs['learning_stage'] == 'eval':
+    print('congrats nothing crashed')
+    pass
+    #model = init_model(model_name, model_configs, state_dictionaries, patch_width, number_of_channels).to(device=configs['device'])
+    #wandb = init_wandb(configs, model_configs)
 
-    for dataset in [test_dataset, val_dataset, test_dataset]:
-        for area in dataset.areas_in_the_set:
-            loader = create_dataloader_from_area(dataset, area) #create a subset of the train dataset that
-            #only contains the area I want and puts it into dataloader
-            fullmask = draw(loader,model)
+    #for dataset in [test_dataset, val_dataset, test_dataset]:
+        #for area in dataset.areas_in_the_set:
+         #   loader = create_dataloader_from_area(dataset, area) #create a subset of the train dataset that
+          #  #only contains the area I want and puts it into dataloader
+           # fullmask = draw(loader,model)
 
     #send the numpy arrays to wandb and save them as rasters to the results folder

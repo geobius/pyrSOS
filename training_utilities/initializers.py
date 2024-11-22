@@ -64,7 +64,7 @@ def init_new_checkpoints_folder(configs):
     return checkpoints_path
 
 def parse_epoch_from_checkpoint_filename(checkpoint_path):
-    epoch = int(checkpoint_path.stem.split('epoch =')[1]) + 1
+    epoch = int(checkpoint_path.stem.split('epoch=')[1]) + 1
     return epoch
 
 
@@ -98,7 +98,7 @@ def init_wandb(configs, model_configs):
 
     if configs['wandb_activate?']:
         wandb.init(project=configs['wandb_project'],
-                   config= all_configs,
+                   config=all_configs,
                    reinit=True)
 
     return
@@ -113,7 +113,7 @@ def init_model(model_name, model_configs, checkpoint, patch_width, inp_channels)
         case 'fc_ef_diff':
             model = FC_EF_diff(input_nbr=inp_channels, label_nbr=2)
         case 'unet':
-            model = Unet(input_nbr=inp_channels, label_nbr=2)
+            model = Unet(in_channels=inp_channels, out_classes=2)
         case 'adhr_cdnet':
             model = ADHR(in_channels=inp_channels, num_classes=2)
         case 'snunet':

@@ -4,11 +4,12 @@ import random
 import pickle
 from rasterio import transform
 import torch
-from torch.utils.data import Sampler, Dataset, Subset
+from torch.utils.data import Sampler, Dataset
 import rasterio as rio
+from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA
 
 # Seed stuff
-np.random.seed(999)
 random.seed(999)
 
 '''
@@ -25,7 +26,7 @@ You can check by loading them to gis program.
 The job of the dataloader is to convert the contents of the paths into tensors.
 '''
 
-configs = pyjson5.load(open('/mnt/7EBA48EEBA48A48D/examhno10/ptyhiakh/pyrsos/python_scripts/configs/general_config.json', 'r'))
+#configs = pyjson5.load(open('/mnt/7EBA48EEBA48A48D/examhno10/ptyhiakh/pyrsos/python_scripts/configs/general_config.json', 'r'))
 
 class Pyrsos_Dataset(Dataset):
     def __init__(self, mode, configs):
@@ -42,8 +43,6 @@ class Pyrsos_Dataset(Dataset):
 
         self.mixed_samples = [item for sublist in self.samples_by_areas.values() for item in sublist]
 
-        # Keep the positive indices in a separate list (useful for under/oversampling)
-        self.positives_samples = [index for index, sample in enumerate(self.mixed_samples) if 'positive' in sample['label'].name]
 
 
 
@@ -101,41 +100,71 @@ class Pyrsos_Dataset(Dataset):
 
         return scaled_pre_image, scaled_post_image, label_image, transform
 
-'''
-def find_indices_for_area(dataset, area):
 
-def create_dataloader_from_area(dataset, area):
-    patches_from_the_same_image = dataset.patches_by_areas[area]
+class Burned_Area_Sampler(Sampler):
 
-    # return a dataloader that only contains the patches that belong to the area in question
-'''
-
-
-class OverSampler(Sampler):
-    '''
-    A Sampler which performs oversampling in imbalanced datasets.
-    '''
-    def __init__(self, dataset, positive_prc=0.5):
-        self.dataset = dataset
-        self.positive_prc = positive_prc
-        self.n_samples = len(dataset)
-
-
-    def __iter__(self):
-        positives = self.dataset.events_df[self.dataset.events_df['positive_flag']].index.values
-        pos = np.random.choice(positives, int(self.positive_prc * self.n_samples), replace=True)
-        neg = np.random.choice(list(set(self.dataset.events_df.index.values) - set(positives)), int(((1 - self.positive_prc) * self.n_samples) + 1))
-
-        idx = np.hstack([pos, neg])
-        np.random.shuffle(idx)
-
-        idx = idx[:self.n_samples]
-
-        pos_cnt = len([i for i in idx if i in pos])
-        print(f'Using {pos_cnt} POS and {len(idx) - pos_cnt} NEG (1:{((len(idx) - pos_cnt) / pos_cnt):.2f}).')
-
-        return iter(idx)
-
+    def __init__(self, dataset):
+        self.positive_samples = [index for index, sample in enumerate(dataset.mixed_samples) if 'positive' in sample['label'].name]
 
     def __len__(self):
-        return len(self.dataset)
+        return len(self.positive_samples)
+
+    def __iter__(self):
+        random.shuffle(self.positive_samples)
+        return iter(self.positive_samples)
+
+
+
+def load_lma_as_pixels(path_to_pickle_file, should_perform_pca=False):
+    ds_path = Path(path_to_pickle_file)
+    samples_by_areas = pickle.load(open(ds_path, 'rb'))
+
+    mixed_samples = [item for sublist in samples_by_areas.values() for item in sublist]
+
+    pixel_features = []
+    pixel_labels = []
+
+    for sample in mixed_samples:
+        post_image_path = sample['lma']
+        label_path = sample['label']
+
+        with rio.open(post_image_path) as post_ds:
+            height = post_ds.height
+            width = post_ds.width
+            channels = post_ds.count
+            post_image = post_ds.read()
+            transposed = np.transpose(post_image, (1, 2, 0))
+            table_shape = np.reshape(transposed, (height * width, channels))
+            pixel_features.append(table_shape)
+
+        with rio.open(label_path) as label_ds:
+            label_image = label_ds.read(1).flatten()
+            pixel_labels.append(label_image)
+
+    concatenated_pixel_features = np.concatenate(pixel_features, 0).astype(np.float32)
+    concatenated_pixel_labels = np.concatenate(pixel_labels)
+
+    if should_perform_pca:
+        scaler = StandardScaler()
+        standardized_pixel_features = scaler.fit_transform(concatenated_pixel_features)
+        pca = PCA(2)
+        transformed_pixel_features = pca.fit_transform(standardized_pixel_features)
+
+        return transformed_pixel_features, concatenated_pixel_labels, pca
+
+    else:
+        return concatenated_pixel_features, concatenated_pixel_labels
+
+"""
+class Pixel_Dataset(Dataset):
+    def __init__(self, path_to_pickle_file):
+        self.pixel_features, self.pixel_labels = load_lma_as_pixels(path_to_pickle_file)
+        self.pixel_features = torch.from_numpy(self.pixel_features) / 255
+        self.pixel_labels = torch.from_numpy(self.pixel_labels)
+
+    def __len__(self):
+        return len(self.pixel_labels)
+
+    def __getitem__(self, index):
+        return self.pixel_features[index, :], self.pixel_labels[index]
+"""

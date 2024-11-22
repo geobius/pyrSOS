@@ -64,7 +64,7 @@ def eval1epoch(model, dataloader, loss_function, device):
 
 
 def wandb_log_metrics(loss, metrics, learning_rate, epoch, rep_i, learning_stage, should_log):
-    Dice_scores = metrics['Dice']
+    dice_scores = metrics['dice']
     iou_scores = metrics['iou']
 
     mean_iou = iou_scores.mean()
@@ -72,8 +72,8 @@ def wandb_log_metrics(loss, metrics, learning_rate, epoch, rep_i, learning_stage
     log_dict = {
         f'({rep_i}) Epoch': epoch,
         f'({rep_i}) {learning_stage} Loss': loss,
-        f'({rep_i}) {learning_stage} Dice ({CLASS_LABELS[0]})': 100 * Dice_scores[0].item(),
-        f'({rep_i}) {learning_stage} Dice ({CLASS_LABELS[1]})': 100 * Dice_scores[1].item(),
+        f'({rep_i}) {learning_stage} Dice ({CLASS_LABELS[0]})': 100 * dice_scores[0].item(),
+        f'({rep_i}) {learning_stage} Dice ({CLASS_LABELS[1]})': 100 * dice_scores[1].item(),
         f'({rep_i}) {learning_stage} IoU ({CLASS_LABELS[0]})': 100 * iou_scores[0].item(),
         f'({rep_i}) {learning_stage} IoU ({CLASS_LABELS[1]})': 100 * iou_scores[1].item(),
         f'({rep_i}) {learning_stage} MeanIoU': 100 * mean_iou.item(),
