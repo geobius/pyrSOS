@@ -11,6 +11,7 @@ from rasterio.merge import merge
 from matplotlib import pyplot as plt
 from matplotlib.colors import ListedColormap
 from dataset_cleaners.pyrsos_make_dataset import get_padding_offset, pad_image
+from .dataloaders import Pyrsos_Dataset
 import pickle
 
 """
@@ -87,7 +88,6 @@ def patch_to_prediction(trained_model, patch_array, pca=None):
 
 
 
-
 class lma_pixel_classifier_visualizer():
     def __init__(self, trained_model, path_to_pickle_file, pca_object=None):
         self.trained_model = trained_model
@@ -135,5 +135,77 @@ class lma_pixel_classifier_visualizer():
                 self.index = (self.index + 1) % len(self.mixed_samples)
             case 'left':
                 self.index = (self.index - 1) % len(self.mixed_samples)
+
+        self.display()
+
+
+
+def patch_to_prediction_convolutional(trained_model, pre_patch, post_patch, device):
+    pre_tensor = pre_patch.unsqueeze(0).float().to(device=device)
+    post_tensor = post_patch.unsqueeze(0).float().to(device=device)
+
+    with torch.no_grad():
+        trained_model.eval()
+        prediction_tensor = trained_model(pre_tensor, post_tensor)
+        probabilities = torch.softmax(prediction_tensor, dim=1)
+        mask = torch.argmax(probabilities, dim=1).squeeze().cpu()
+    return mask
+
+
+class convolutional_classifier_visualizer():
+    def __init__(self, trained_model, mode, configs):
+        self.trained_model = trained_model
+        self.mode = mode
+        self.configs = configs
+        self.fig, self.axes = plt.subplots(1, 4, figsize=(20, 10))
+        self.index = 0
+
+        self.dataset = Pyrsos_Dataset(mode, self.configs)
+        self.fig.canvas.mpl_connect('key_press_event', self.on_key)
+        self.display()
+        plt.show()
+
+    def display(self):
+        pre_patch, post_patch, label_image, transform = self.dataset[self.index]
+        prediction = patch_to_prediction_convolutional(self.trained_model, pre_patch, post_patch, self.configs['device'])
+
+        burnt_scheme = ListedColormap(['black', 'orange'])
+        _, height, width = post_patch.shape
+        left, top = transform * (0, 0)
+        right, bottom = transform * (width, height)
+        image_extent = (left, right, bottom, top)
+
+        for ax in self.axes:
+            ax.clear()
+
+
+        pre_patch_visual = np.transpose(pre_patch.numpy(),
+                                        (1, 2, 0))[:, :, [3, 1, 0]]
+        self.axes[0].set_title('pre patch')
+        self.axes[0].imshow(pre_patch_visual, extent=image_extent)
+
+
+        post_patch_visual = np.transpose(post_patch.numpy(),
+                                         (1, 2, 0))[:, :, [3, 1, 0]]
+        self.axes[1].set_title('post patch')
+        self.axes[1].imshow(post_patch_visual, extent=image_extent)
+
+        self.axes[2].set_title('manual label')
+        self.axes[2].imshow(label_image.numpy(),
+                            extent=image_extent, cmap=burnt_scheme)
+
+        self.axes[3].set_title('model prediction')
+        self.axes[3].imshow(prediction.numpy(),
+                            extent=image_extent, cmap=burnt_scheme)
+
+        self.fig.canvas.draw()
+
+
+    def on_key(self, event):
+        match(event.key):
+            case 'right':
+                self.index = (self.index + 1) % len(self.dataset)
+            case 'left':
+                self.index = (self.index - 1) % len(self.dataset)
 
         self.display()

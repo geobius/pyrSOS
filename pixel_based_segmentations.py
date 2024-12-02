@@ -7,7 +7,7 @@ import pyjson5
 import numpy as np
 import rasterio as rio
 from matplotlib import pyplot as plt
-from sklearn.metrics import f1_score, jaccard_score, accuracy_score, recall_score
+from sklearn.metrics import f1_score, jaccard_score, precision_score, recall_score
 from itertools import product
 
 
@@ -15,59 +15,18 @@ from xgboost import XGBClassifier
 from sklearn.linear_model import SGDClassifier
 from sklearn.neural_network import MLPClassifier
 from sklearn.linear_model import LogisticRegression
-from sklearn.svm import SVC
+from sklearn.svm import LinearSVC
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier
+
+from sklearn.tree import plot_tree
+
 
 from training_utilities.dataloaders import load_lma_as_pixels
 from training_utilities.prediction_visualization import lma_pixel_classifier_visualizer
 
 
-def evaluate_model(fixed_hyperparameters, criterion, x_train, y_train, x_val, y_val):
-    eval_set = [(x_train, y_train), (x_val, y_val)]
 
-    model = XGBClassifier(**fixed_hyperparameters)
-    model.fit(x_train, y_train,
-              eval_set=eval_set)
-    val_outputs = model.predict(x_val)
-    val_score = criterion(y_val, val_outputs)
-
-    return val_score
-
-
-def GridSearch(dictionary_of_possible_hyperparameters, criterion, x_train, y_train, x_val, y_val):
-    best_score = 0
-    best_hyperparameters = {}
-
-    for params in product(*dictionary_of_possible_hyperparameters.values()):
-        param_dict = dict(zip(dictionary_of_possible_hyperparameters.keys(), params))
-        val_score = evaluate_model(param_dict, criterion, x_train, y_train, x_val, y_val)
-
-        if val_score > best_score:
-            best_score = val_score
-            best_hyperparameters = param_dict
-
-    return best_score, best_hyperparameters
-
-
-
-
-
-
-"""
-hyperparameters = {
-    'objective': ['binary:logistic'],
-    'eval_metric': ['aucpr'],
-    'base_score': [0.5],
-    'tree_method': ['hist'],
-    'early_stopping_rounds': [3],
-    'verbose': [1],
-    'n_estimators': [5],
-    'max_depth': [4],
-    'learning_rate': [0.3]
-}
-
-"""
 
 
 train_pickle = '/mnt/7EBA48EEBA48A48D/examhno10/ptyhiakh/pyrsos/destination/TrainEvents_v1.pkl'
@@ -78,24 +37,47 @@ x_train, y_train = load_lma_as_pixels(train_pickle)
 x_val, y_val = load_lma_as_pixels(val_pickle)
 x_test, y_test = load_lma_as_pixels(test_pickle)
 
-#x_train_reduced, y_train_reduced, pca = load_lma_as_pixels(train_pickle, True)
-#x_val_reduced, y_val_reduced, pca = load_lma_as_pixels(train_pickle, True)
+
+
+tree_hyperparameters = {
+    'ccp_alpha': 0.0,
+    'class_weight': None,
+    'criterion': 'gini',
+    'max_depth': 60,
+    'max_features': None,
+    'max_leaf_nodes': None,
+    'min_impurity_decrease': 0.0,
+    'min_samples_leaf': 1,
+    'min_samples_split': 2,
+    'min_weight_fraction_leaf': 0.0,
+    'monotonic_cst': None,
+    'random_state': None,
+    'splitter': 'best'}
+
+
+forest_hyperparameters = {
+    'n_estimators': 20,
+    'class_weight': None,
+    'criterion': 'gini',
+    'max_depth': 10,
+    'random_state': 5385}
 
 
 
-#best_score, best_hyperparameters = GridSearch(best_hyperparameters, f1_score, x_train, y_train, x_val, y_val)
-best_hyperparameters = {
+
+xgboost_hyperparameters = {
     'objective': 'binary:logistic',
     'eval_metric': 'logloss',
     'base_score': 0.5,
     'tree_method': 'hist',
     'early_stopping_rounds': 10,
     'verbose': 1,
-    'n_estimators': 75,
-    'max_depth': 6,
+    'n_estimators': 5,
+    'max_depth': 30,
     'learning_rate': 0.3,
-    'scale_pos_weight': 1
+    'scale_pos_weight': 3
 }
+
 
 
 def pick_model(name):
@@ -105,16 +87,16 @@ def pick_model(name):
             model = LogisticRegression()
             model.fit(x_train, y_train)
         case 'svm':
-            model = SGDClassifier(loss='hinge', max_iter=50, verbose=1, shuffle=True)
+            model = SGDClassifier(loss='hinge', max_iter=80, verbose=1, shuffle=True, random_state=549)
             model.fit(x_train, y_train)
         case 'tree':
-            model = DecisionTreeClassifier()
+            model = DecisionTreeClassifier(**tree_hyperparameters)
             model.fit(x_train, y_train)
         case 'forest':
-            model = RandomForestClassifier()
+            model = RandomForestClassifier(**forest_hyperparameters)
             model.fit(x_train, y_train)
         case 'xgb':
-            model = XGBClassifier(**best_hyperparameters)
+            model = XGBClassifier(**xgboost_hyperparameters)
             model.fit(x_train, y_train,
                       eval_set=[(x_train, y_train), (x_val, y_val)])
         case 'mlp':
@@ -128,24 +110,37 @@ def pick_model(name):
 
     return model
 
-trained_model = pick_model('forest')
-
-train_predictions = trained_model.predict(x_train)
-val_predictions = trained_model.predict(x_val)
-test_predictions = trained_model.predict(x_test)
 
 
-jc = [0, 0, 0]
-acc = [0, 0, 0]
-rec = [0, 0, 0]
-for i, prediction in enumerate(train_predictions, val_predictions, test_predictions):
-    jc[i] = jaccard_score(val_predictions, y_val)
-    acc[i] = accuracy_score(val_predictions, y_val)
-    rec[i] = recall_score(val_predictions, y_val)
+def run(model_name):
+    trained_model = pick_model(model_name)
+    train_predictions = trained_model.predict(x_train)
+    val_predictions = trained_model.predict(x_val)
+    test_predictions = trained_model.predict(x_test)
 
-print('train', 'val', 'test')
-print(jc)
-print(acc)
-print(rec)
+    prec = [0, 0, 0]
+    rec = [0, 0, 0]
+    jc = [0, 0, 0]
 
-#vis = lma_pixel_classifier_visualizer(trained_model, train_pickle)
+    for i, (estimated, manual) in enumerate(zip([train_predictions, val_predictions, test_predictions],
+                                  [y_train, y_val, y_test])):
+
+        prec[i] = precision_score(estimated, manual)*100
+        rec[i] = recall_score(estimated, manual)*100
+        jc[i] = jaccard_score(estimated, manual)*100
+
+    print('precision recall IOU ')
+    for i in range(3):
+        print(f"{prec[i]:.2f} & {rec[i]:.2f} & {jc[i]:.2f} &")
+
+
+    return trained_model
+
+
+#trained_log = run('log')
+#trained_svm = run('svm')
+trained_tree = run('tree')
+#trained_forest = run('forest')
+#trained_xgb = run('xgb')
+
+vis = lma_pixel_classifier_visualizer(trained_tree, val_pickle)

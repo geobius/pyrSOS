@@ -9,6 +9,10 @@ import rasterio as rio
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 
+import torchvision.transforms as T
+import torchvision.transforms.functional as TF
+
+
 # Seed stuff
 random.seed(999)
 
@@ -63,6 +67,38 @@ class Pyrsos_Dataset(Dataset):
 
         return scaled_image
 
+    def augment(self, pre_patch, post_patch, label_patch, should_augment):
+        '''
+        Applies the following augmentations:
+        - Random horizontal flipping (possibility = 0.5)
+        - Random vertical flipping (possibility = 0.5)
+        - Random rotation (-15 to +15 deg)
+        '''
+
+        pre_aug = pre_patch
+        post_aug = post_patch
+        label_aug = label_patch
+       
+        if random.random() > 0.5 and should_augment:
+            pre_aug = TF.hflip(pre_aug)
+            post_aug = TF.hflip(post_aug)
+            label_aug = TF.hflip(label_aug)
+
+        if random.random() > 0.5 and should_augment:
+            pre_aug = TF.vflip(pre_aug)
+            post_aug = TF.vflip(post_aug)
+            label = TF.vflip(label_aug)
+
+        if random.random() > 0.5 and should_augment:
+            angle = random.uniform(-15, 15)
+            pre_aug = TF.rotate(pre_aug, angle=angle)
+            post_aug = TF.rotate(post_aug, angle=angle)
+            label_aug = TF.rotate(label_aug.unsqueeze(0), angle=angle).squeeze()
+
+
+        return pre_aug, post_aug, label_aug
+
+
 
     def load_images(self, sample):
         '''
@@ -95,10 +131,13 @@ class Pyrsos_Dataset(Dataset):
     def __getitem__(self, event_id):
         sample = self.mixed_samples[event_id]
         pre_image, post_image, label_image, transform = self.load_images(sample)
+
         scaled_pre_image = self.scale_image(pre_image, self.configs['pre_data_source'], self.configs['pre_normalize?'])
         scaled_post_image = self.scale_image(post_image, self.configs['post_data_source'], self.configs['post_normalize?'])
+        augmented_pre_image, augmented_post_image, augmented_label_image = self.augment(scaled_pre_image, scaled_post_image, label_image,
+                                                                                  self.configs['augment?'])
 
-        return scaled_pre_image, scaled_post_image, label_image, transform
+        return augmented_pre_image, augmented_post_image, augmented_label_image, transform
 
 
 class Burned_Area_Sampler(Sampler):

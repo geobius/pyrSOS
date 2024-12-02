@@ -8,7 +8,7 @@ from torch.utils import checkpoint
 from torchmetrics import MetricCollection
 from itertools import chain
 import rasterio as rio
-from torchmetrics.segmentation import GeneralizedDiceScore, MeanIoU, mean_iou
+from torchmetrics.classification import BinaryPrecision, BinaryRecall, BinaryJaccardIndex
 import wandb
 
 from .config_parsers import font_colors
@@ -206,8 +206,9 @@ def compute_class_weights(configs):
 def init_metrics():
 
     pyrsos_metrics = MetricCollection({
-        "dice": GeneralizedDiceScore(num_classes=2, input_format='index', per_class=True),
-        "iou": MeanIoU(num_classes=2, input_format='index', per_class=True)
+        "iou": BinaryJaccardIndex(),
+        "precision": BinaryPrecision(),
+        "recall": BinaryRecall()
     })
 
     return pyrsos_metrics

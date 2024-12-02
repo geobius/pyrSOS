@@ -1,5 +1,5 @@
 {
-    "model": "unet",
+    "model": "bam_cd",
     "learning_stage": "eval",//train or eval
     "#workers": 2,
     "seed": 999,
@@ -11,6 +11,7 @@
     "save_every_n_epochs": 25,
     "loss_function": "cross_entropy",
     "weighted_loss?": false,
+    "augment?": false,
 
     "wandb_project": "pretraining",
     "wandb_entity": "",
@@ -20,7 +21,7 @@
 
     "dataset_path": "/mnt/7EBA48EEBA48A48D/examhno10/ptyhiakh/pyrsos/destination/",
     "results_path": "/mnt/7EBA48EEBA48A48D/examhno10/ptyhiakh/pyrsos/results/",
-    "load_state_path": "/mnt/7EBA48EEBA48A48D/examhno10/ptyhiakh/pyrsos/results/unet/20241106201618/checkpoints/0/checkpoint_epoch=99.pt",
+    "load_state_path": "/mnt/7EBA48EEBA48A48D/examhno10/ptyhiakh/pyrsos/results/bam_cd/trained/checkpoint_epoch=184.pt",
 
     "train": "TrainEvents_v1.pkl",
     "val": "ValidationEvents_v1.pkl",

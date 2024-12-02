@@ -86,6 +86,10 @@ def read_learning_configs(configs_path):
         f"""{font_colors.RED}Error: weighted_loss? does not have a valid value.{font_colors.ENDC}
         A valid weighted_loss? value must be a bool"""
 
+    assert isinstance(configs['augment?'], bool),\
+        f"""{font_colors.RED}Error: augment? does not have a valid value.{font_colors.ENDC}
+        A valid augment? value must be a bool"""
+
 
     assert isinstance(configs['wandb_project'], str), \
         f"""{font_colors.RED}Error: wandb_project does not have a valid value.{font_colors.ENDC}

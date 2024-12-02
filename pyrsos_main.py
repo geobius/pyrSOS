@@ -18,6 +18,7 @@ from pathlib import Path
 import torch
 from torch.utils.data import DataLoader
 
+
 from training_utilities.config_parsers import (
     read_learning_configs,
     font_colors)
@@ -39,7 +40,8 @@ from training_utilities.learning_loops import (
     eval1epoch,
     wandb_log_metrics
 )
-#from training_utilities.prediction_visualization import predict_whole_mask
+
+from training_utilities.prediction_visualization import convolutional_classifier_visualizer
 
 
 parser = argparse.ArgumentParser()
@@ -73,12 +75,12 @@ test_dataset = Pyrsos_Dataset('test', configs)
 
 train_sampler = Burned_Area_Sampler(train_dataset)
 
-train_loader = DataLoader(train_dataset, num_workers=configs['#workers'], batch_size=configs['batch_size'], sampler=train_sampler, pin_memory=True)
-val_loader = DataLoader(val_dataset, num_workers=configs['#workers'], batch_size=configs['batch_size'], shuffle=True, pin_memory=True)
-test_loader = DataLoader(test_dataset, num_workers=configs['#workers'], batch_size=configs['batch_size'], shuffle=True, pin_memory=True)
 
 
 if configs['learning_stage'] == 'train':
+    train_loader = DataLoader(train_dataset, num_workers=configs['#workers'], batch_size=configs['batch_size'], sampler=train_sampler, pin_memory=True)
+    val_loader = DataLoader(val_dataset, num_workers=configs['#workers'], batch_size=configs['batch_size'], shuffle=True, pin_memory=True)
+    test_loader = DataLoader(test_dataset, num_workers=configs['#workers'], batch_size=configs['batch_size'], shuffle=True, pin_memory=True)
 
     print(f'{font_colors.CYAN}Using {configs["loss_function"]} with class weights: {class_weights["train"]}.{font_colors.ENDC}')
 
@@ -92,6 +94,10 @@ if configs['learning_stage'] == 'train':
         optimizer = init_optimizer(model, state_dictionaries, configs, model_configs)
         lr_scheduler = init_lr_scheduler(optimizer, state_dictionaries, configs, model_configs)
         wandb = init_wandb(configs, model_configs)
+
+        best_model = {}
+        best_val_loss = 999999
+        best_epoch = 0
 
         for epoch in range(starting_epoch, last_epoch):
             print(f'=== Epoch: {epoch} ===')
@@ -110,10 +116,15 @@ if configs['learning_stage'] == 'train':
             print(f'Mean Validation Loss: {val_loss:.6f}')
             wandb_log_metrics(val_loss, val_metrics, learning_rate, epoch, rep_i, 'validation', configs['wandb_activate?'])
 
+            if val_loss < best_val_loss:
+                best_val_loss = val_loss
+                best_model = model
+                best_epoch = epoch
+
             if (save_every > 0 and epoch % save_every == 0) or (epoch == last_epoch-1):
                 (checkpoints_folder / f'{rep_i}').mkdir(parents=True, exist_ok=True)
-                new_checkpoint_path = checkpoints_folder / f'{rep_i}' / f'checkpoint_epoch={epoch}.pt'
-                save_checkpoint(new_checkpoint_path, val_loss, model, optimizer, lr_scheduler)
+                new_checkpoint_path = checkpoints_folder / f'{rep_i}' / f'checkpoint_epoch={best_epoch}.pt'
+                save_checkpoint(new_checkpoint_path, best_val_loss, best_model, optimizer, lr_scheduler)
 
         print('---Validating on test data---')
         test_loss, test_metrics = eval1epoch(model, test_loader, test_criterion, configs['device'])  #metrics for overfitting checks.
@@ -124,9 +135,10 @@ if configs['learning_stage'] == 'train':
 
 
 if configs['learning_stage'] == 'eval':
-    print('congrats nothing crashed')
-    pass
-    #model = init_model(model_name, model_configs, state_dictionaries, patch_width, number_of_channels).to(device=configs['device'])
+    model = init_model(model_name, model_configs, state_dictionaries, patch_width, number_of_channels).to(device=configs['device'])
+    vis = convolutional_classifier_visualizer(model, 'val', configs)
+
+
     #wandb = init_wandb(configs, model_configs)
 
     #for dataset in [test_dataset, val_dataset, test_dataset]:

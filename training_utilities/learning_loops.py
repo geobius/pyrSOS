@@ -64,19 +64,16 @@ def eval1epoch(model, dataloader, loss_function, device):
 
 
 def wandb_log_metrics(loss, metrics, learning_rate, epoch, rep_i, learning_stage, should_log):
-    dice_scores = metrics['dice']
-    iou_scores = metrics['iou']
-
-    mean_iou = iou_scores.mean()
+    iou_score = metrics['iou']
+    precision_score = metrics['precision']
+    recall_score = metrics['recall']
 
     log_dict = {
         f'({rep_i}) Epoch': epoch,
         f'({rep_i}) {learning_stage} Loss': loss,
-        f'({rep_i}) {learning_stage} Dice ({CLASS_LABELS[0]})': 100 * dice_scores[0].item(),
-        f'({rep_i}) {learning_stage} Dice ({CLASS_LABELS[1]})': 100 * dice_scores[1].item(),
-        f'({rep_i}) {learning_stage} IoU ({CLASS_LABELS[0]})': 100 * iou_scores[0].item(),
-        f'({rep_i}) {learning_stage} IoU ({CLASS_LABELS[1]})': 100 * iou_scores[1].item(),
-        f'({rep_i}) {learning_stage} MeanIoU': 100 * mean_iou.item(),
+        f'({rep_i}) {learning_stage} IoU ({CLASS_LABELS[1]})': 100 * iou_score.item(),
+        f'({rep_i}) {learning_stage} Precision ({CLASS_LABELS[1]})': 100 * precision_score.item(),
+        f'({rep_i}) {learning_stage} Recall ({CLASS_LABELS[1]})': 100 * recall_score.item(),
         f'({rep_i}) lr': learning_rate
             }
     if should_log:
