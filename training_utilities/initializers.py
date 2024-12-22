@@ -113,7 +113,7 @@ def init_model(model_name, model_configs, checkpoint, patch_width, inp_channels)
         case 'fc_ef_diff':
             model = FC_EF_diff(input_nbr=inp_channels, label_nbr=2)
         case 'unet':
-            model = Unet(in_channels=inp_channels, out_classes=2)
+            model = Unet(input_nbr=inp_channels, label_nbr=2)
         case 'adhr_cdnet':
             model = ADHR(in_channels=inp_channels, num_classes=2)
         case 'snunet':

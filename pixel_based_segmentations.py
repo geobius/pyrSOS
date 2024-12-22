@@ -43,7 +43,7 @@ tree_hyperparameters = {
     'ccp_alpha': 0.0,
     'class_weight': None,
     'criterion': 'gini',
-    'max_depth': 60,
+    'max_depth': 10,
     'max_features': None,
     'max_leaf_nodes': None,
     'min_impurity_decrease': 0.0,
@@ -72,10 +72,10 @@ xgboost_hyperparameters = {
     'tree_method': 'hist',
     'early_stopping_rounds': 10,
     'verbose': 1,
-    'n_estimators': 5,
+    'n_estimators': 6,
     'max_depth': 30,
     'learning_rate': 0.3,
-    'scale_pos_weight': 3
+    'scale_pos_weight': 1
 }
 
 
@@ -139,8 +139,8 @@ def run(model_name):
 
 #trained_log = run('log')
 #trained_svm = run('svm')
-trained_tree = run('tree')
+#trained_tree = run('tree')
 #trained_forest = run('forest')
-#trained_xgb = run('xgb')
+trained_xgb = run('xgb')
 
-vis = lma_pixel_classifier_visualizer(trained_tree, val_pickle)
+#vis = lma_pixel_classifier_visualizer(trained_tree, val_pickle)

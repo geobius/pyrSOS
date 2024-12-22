@@ -135,7 +135,13 @@ if configs['learning_stage'] == 'train':
 
 
 if configs['learning_stage'] == 'eval':
+    test_loader = DataLoader(test_dataset, num_workers=configs['#workers'], batch_size=configs['batch_size'], shuffle=True, pin_memory=True)
+    test_criterion = init_loss(loss_function_name, class_weights['test'], model_configs).to(device=configs['device'])
     model = init_model(model_name, model_configs, state_dictionaries, patch_width, number_of_channels).to(device=configs['device'])
+    test_loss, test_metrics = eval1epoch(model, test_loader, test_criterion, configs['device'])  #metrics for overfitting checks.
+
+    print(f'Mean Testing Loss: {test_loss:.6f}')
+    print(f'metrics: {test_metrics}')
     vis = convolutional_classifier_visualizer(model, 'val', configs)
 
 

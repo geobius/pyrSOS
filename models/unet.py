@@ -42,10 +42,21 @@ class Decoder(nn.Module):
 
         return self.conv_op(merged)
 
-class Unet(nn.Module):
+
+class Segmentation_Head(nn.Module):
     def __init__(self, in_channels, out_classes):
+     self.final_convolution = nn.Conv2d(in_channels, out_classes, kernel_size=1)
+
+    def forward(self, x):
+        y = self.final_convolution(x)
+        return y
+
+
+
+class Unet(nn.Module):
+    def __init__(self, input_nbr, label_nbr):
         super().__init__()
-        self.Down_Block1 = Encoder(in_channels, 64)
+        self.Down_Block1 = Encoder(2*input_nbr, 64)
         self.Down_Block2 = Encoder(64, 128)
         self.Down_Block3 = Encoder(128, 256)
         self.Down_Block4 = Encoder(256, 512)
@@ -57,11 +68,11 @@ class Unet(nn.Module):
         self.Up_Block2 = Decoder(256, 128)
         self.Up_Block1 = Decoder(128, 64)
 
-        self.Segmentation_Head = nn.Conv2d(64, out_classes, kernel_size=1)
+        self.Segmentation_Head = nn.Conv2d(64, label_nbr, kernel_size=1)
 
     def forward(self, pre_image, post_image):
-        #pre_image is not used but I keep it as a parameter for concistency of calling convention
-        skip1, down1 = self.Down_Block1(post_image)
+        concatenated_image = torch.cat((pre_image, post_image), 1)
+        skip1, down1 = self.Down_Block1(concatenated_image)
         skip2, down2 = self.Down_Block2(down1)
         skip3, down3 = self.Down_Block3(down2)
         skip4, down4 = self.Down_Block4(down3)
@@ -73,6 +84,6 @@ class Unet(nn.Module):
         up2 = self.Up_Block2(up3, skip2)
         up1 = self.Up_Block1(up2, skip1)
 
-        output = self.Segmentation_Head(up1)
+        logits = self.Segmentation_Head(up1)
 
-        return output
+        return logits

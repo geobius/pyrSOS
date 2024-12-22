@@ -21,8 +21,7 @@
 
     "dataset_path": "/mnt/7EBA48EEBA48A48D/examhno10/ptyhiakh/pyrsos/destination/",
     "results_path": "/mnt/7EBA48EEBA48A48D/examhno10/ptyhiakh/pyrsos/results/",
-    "load_state_path": "/mnt/7EBA48EEBA48A48D/examhno10/ptyhiakh/pyrsos/results/bam_cd/trained/checkpoint_epoch=184.pt",
-
+    "load_state_path": "/mnt/7EBA48EEBA48A48D/examhno10/ptyhiakh/pyrsos/results/bam_cd/resnet50/checkpoint_epoch=91.pt",
     "train": "TrainEvents_v1.pkl",
     "val": "ValidationEvents_v1.pkl",
     "test": "TestingEvents_v1.pkl",
