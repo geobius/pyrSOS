@@ -1,7 +1,7 @@
 from pathlib import Path
 import numpy as np
 import random
-import pickle
+import pyjson5
 from rasterio import transform
 import torch
 from torch.utils.data import Sampler, Dataset
@@ -17,57 +17,65 @@ import torchvision.transforms.functional as TF
 random.seed(999)
 
 '''
-Structure of a pickle file.
-There are 3 pickle files in total. The training set, The validation set, The testing set
-Each pickle file contains a single dictionary. Its keys correspond to the area of interest available in the set in question
-for example the training set could contain 'domokos', 'yliki'.
-By choosing a key you are transfered to an ordered list of 'samples' from that area.
-Sample is a dictionary that maps keys to patch paths.
-It has 4keys in total: sen2_pre, sen2_post, lma_post, label
-The patch_paths refer to small subsets of the original downloaded images. They all share the same bounding box coordinates and thus overlap.
-You can check by loading them to gis program.
 
-The job of the dataloader is to convert the contents of the paths into tensors.
+Structure of a json split file.
+It is a dictionary with 3 keys.
+training set, validation set, testing set
+Each key associates with a list of area names
+
+Each subfolder represents a geographic place and contains equally sized patches
+Every patch follows this naming convention
+{area}_{platform}_{pre or post}_{gsd}_{multiband or label}_{row id}_{column id}.tif
+patches that have the same area and row id and column id geographically overlap pixel by pixel.
+
+
+The job of the dataloader is to find which patches overlap and load them as tensors.
+
 '''
 
 #configs = pyjson5.load(open('/mnt/7EBA48EEBA48A48D/examhno10/ptyhiakh/pyrsos/python_scripts/configs/general_config.json', 'r'))
 
+
+def substitute_names(label_patches_paths, platform, pre_or_post):
+    new_patches_paths = []
+    for path in label_patches_paths:
+        naming_components = path.stem.split('_')
+        root = path.parent
+
+        naming_components[1] = platform
+        naming_components[2] = pre_or_post
+        naming_components[4] = 'multiband'
+
+        new_stem = "_".join(naming_components)
+        new_path = root/f'{new_stem}.tif'
+        new_patches_paths.append(new_path)
+
+    return new_patches_paths
+
+
+
 class Pyrsos_Dataset(Dataset):
     def __init__(self, mode, configs):
 
+        ds_path = Path(configs['dataset_path'])
+        splits = pyjson5.load(open(ds_path / configs['split_filename'], 'r'))
+
         self.configs = configs
+        self.mode = mode
+        self.areas_in_the_set = splits[mode]
 
-        # Read the pickle files containing information on the splits
-        ds_path = Path(self.configs['dataset_path'])
-        self.samples_by_areas = pickle.load(open(ds_path / configs[mode], 'rb'))
+        label_paths_per_area = [list((ds_path/area).glob('*label_*.tif')) for area in self.areas_in_the_set]
+        merged_label_paths = [item for sublist in label_paths_per_area for item in sublist]
+
+        self.pre_patches_paths = substitute_names(merged_label_paths, configs['pre_data_source'], 'pre')
+        self.post_patches_paths = substitute_names(merged_label_paths, configs['post_data_source'], 'post')
+        self.label_patches_paths = merged_label_paths
        
-        self.areas_in_the_set = self.samples_by_areas.keys()
-        self.number_of_samples_per_area = {area: len(samples) for area, samples in self.samples_by_areas.items()}
-        self.total_length = sum(self.number_of_samples_per_area.values())
-
-        self.mixed_samples = [item for sublist in self.samples_by_areas.values() for item in sublist]
+        self.samples = list(zip(self.pre_patches_paths, self.post_patches_paths, self.label_patches_paths))
 
 
 
-
-    def scale_image(self, image, data_source, must_normalize):
-        scaling_constant = 1
-        match data_source:
-            case 'sen2_pre':
-                scaling_constant = 10000
-            case 'sen2_post':
-                scaling_constant = 10000
-            case 'lma':
-                scaling_constant = 255
-
-        scaled_image = image
-
-        if must_normalize:
-            scaled_image = image.to(torch.float32) / scaling_constant
-
-        return scaled_image
-
-    def augment(self, pre_patch, post_patch, label_patch, should_augment):
+    def augment(self, pre_patch, post_patch, label_patch):
         '''
         Applies the following augmentations:
         - Random horizontal flipping (possibility = 0.5)
@@ -78,18 +86,18 @@ class Pyrsos_Dataset(Dataset):
         pre_aug = pre_patch
         post_aug = post_patch
         label_aug = label_patch
-       
-        if random.random() > 0.5 and should_augment:
+
+        if random.random() > 0.5:
             pre_aug = TF.hflip(pre_aug)
             post_aug = TF.hflip(post_aug)
             label_aug = TF.hflip(label_aug)
 
-        if random.random() > 0.5 and should_augment:
+        if random.random() > 0.5:
             pre_aug = TF.vflip(pre_aug)
             post_aug = TF.vflip(post_aug)
-            label = TF.vflip(label_aug)
+            label_aug = TF.vflip(label_aug)
 
-        if random.random() > 0.5 and should_augment:
+        if random.random() > 0.5:
             angle = random.uniform(-15, 15)
             pre_aug = TF.rotate(pre_aug, angle=angle)
             post_aug = TF.rotate(post_aug, angle=angle)
@@ -102,13 +110,13 @@ class Pyrsos_Dataset(Dataset):
 
     def load_images(self, sample):
         '''
-        Each sample is a dictionary that maps keys to patch paths.
+        Each sample is a list of 3 paths to overlapping patches, pre, post, label in this order.
         Find the appropriate paths, load the .tif images, strip away the geocoordinates
         and load the requested bands as tensors.
         '''
-        pre_image_path = sample[self.configs['pre_data_source']]
-        post_image_path = sample[self.configs['post_data_source']]
-        label_path = sample['label']
+        pre_image_path = sample[0]
+        post_image_path = sample[1]
+        label_path = sample[2]
 
         with rio.open(pre_image_path) as pre_ds:
             pre_image = torch.from_numpy(pre_ds.read(self.configs['pre_selected_bands']))
@@ -125,25 +133,23 @@ class Pyrsos_Dataset(Dataset):
 
 
     def __len__(self):
-        return self.total_length
+        return len(self.samples)
 
 
-    def __getitem__(self, event_id):
-        sample = self.mixed_samples[event_id]
+    def __getitem__(self, index):
+        sample = self.samples[index]
         pre_image, post_image, label_image, transform = self.load_images(sample)
 
-        scaled_pre_image = self.scale_image(pre_image, self.configs['pre_data_source'], self.configs['pre_normalize?'])
-        scaled_post_image = self.scale_image(post_image, self.configs['post_data_source'], self.configs['post_normalize?'])
-        augmented_pre_image, augmented_post_image, augmented_label_image = self.augment(scaled_pre_image, scaled_post_image, label_image,
-                                                                                  self.configs['augment?'])
+        if self.configs['augment?'] and self.mode == 'training set':
+            pre_image, post_image, label_image = self.augment(pre_image, post_image, label_image)
 
-        return augmented_pre_image, augmented_post_image, augmented_label_image, transform
+        return pre_image, post_image, label_image, transform
 
 
 class Burned_Area_Sampler(Sampler):
 
     def __init__(self, dataset):
-        self.positive_samples = [index for index, sample in enumerate(dataset.mixed_samples) if 'positive' in sample['label'].name]
+        self.positive_samples = [index for index, sample in enumerate(dataset.samples) if 'positive' in sample[2].stem]
 
     def __len__(self):
         return len(self.positive_samples)
@@ -153,57 +159,79 @@ class Burned_Area_Sampler(Sampler):
         return iter(self.positive_samples)
 
 
+#return
+#a table with 4 columns each represent a spectral band
+#for example if array of shape (4, 256, 128). I want to turn it to array of shape (256*128, 4)
+#so I would have to first transpose (4,256,128) to (256, 128, 4) and then reshape (256*128, 4)
+def image2tabular(image_array):
+    channels, height, width = image_array.shape
+    transposed = np.transpose(image_array, (1, 2, 0))
+    tabular_array = np.reshape(transposed, (height * width, channels))
 
-def load_lma_as_pixels(path_to_pickle_file, should_perform_pca=False):
-    ds_path = Path(path_to_pickle_file)
-    samples_by_areas = pickle.load(open(ds_path, 'rb'))
+    if channels == 1:
+        tabular_array = tabular_array.flatten()
 
-    mixed_samples = [item for sublist in samples_by_areas.values() for item in sublist]
+    return tabular_array
 
-    pixel_features = []
-    pixel_labels = []
-
-    for sample in mixed_samples:
-        post_image_path = sample['lma']
-        label_path = sample['label']
-
-        with rio.open(post_image_path) as post_ds:
-            height = post_ds.height
-            width = post_ds.width
-            channels = post_ds.count
-            post_image = post_ds.read()
-            transposed = np.transpose(post_image, (1, 2, 0))
-            table_shape = np.reshape(transposed, (height * width, channels))
-            pixel_features.append(table_shape)
-
-        with rio.open(label_path) as label_ds:
-            label_image = label_ds.read(1).flatten()
-            pixel_labels.append(label_image)
-
-    concatenated_pixel_features = np.concatenate(pixel_features, 0).astype(np.float32)
-    concatenated_pixel_labels = np.concatenate(pixel_labels)
-
-    if should_perform_pca:
-        scaler = StandardScaler()
-        standardized_pixel_features = scaler.fit_transform(concatenated_pixel_features)
-        pca = PCA(2)
-        transformed_pixel_features = pca.fit_transform(standardized_pixel_features)
-
-        return transformed_pixel_features, concatenated_pixel_labels, pca
-
+def tabular2image(tabular_array, height, width):
+    image_array = []
+    if tabular_array.ndim == 1:
+        image_array = np.reshape(tabular_array, (1, height, width))
     else:
-        return concatenated_pixel_features, concatenated_pixel_labels
+        channels = tabular_array.shape[1]
+        transposed = np.transpose(tabular_array, (1, 0))
+        image_array = np.reshape(transposed, (channels, height, width))
 
-"""
-class Pixel_Dataset(Dataset):
-    def __init__(self, path_to_pickle_file):
-        self.pixel_features, self.pixel_labels = load_lma_as_pixels(path_to_pickle_file)
-        self.pixel_features = torch.from_numpy(self.pixel_features) / 255
-        self.pixel_labels = torch.from_numpy(self.pixel_labels)
+    return image_array
 
-    def __len__(self):
-        return len(self.pixel_labels)
 
-    def __getitem__(self, index):
-        return self.pixel_features[index, :], self.pixel_labels[index]
-"""
+def load_dataset_as_table(mode, pixel_configs_path):
+
+    configs = pyjson5.load(open(pixel_configs_path, 'r'))
+    source_dataset_path = Path(configs['dataset_path'])
+    split_filename = configs['split_filename']
+
+    splits = pyjson5.load(open(source_dataset_path / split_filename, 'r'))
+    areas_in_the_set = splits[mode]
+
+    label_paths_per_area = [list((source_dataset_path/area).glob('*label.tif')) for area in areas_in_the_set]
+    merged_label_paths = [item for sublist in label_paths_per_area for item in sublist]
+
+    pre_platform = configs['pre_data_source']
+    pre_selected_bands = configs['pre_selected_bands']
+    post_platform = configs['post_data_source']
+    post_selected_bands = configs['post_selected_bands']
+
+    pre_images_paths = substitute_names(merged_label_paths, pre_platform, 'pre')
+    post_images_paths = substitute_names(merged_label_paths, post_platform, 'post')
+    label_images_paths = merged_label_paths
+
+    pre_tabular = []
+    post_tabular = []
+    label_tabular = []
+
+    for p in pre_images_paths:
+        pre_tabular = []
+        image_array = rio.open(p).read(pre_selected_bands)
+        pre_tabular.append(image2tabular(image_array))
+
+    for p in post_images_paths:
+        post_tabular = []
+        image_array = rio.open(p).read(post_selected_bands)
+        post_tabular.append(image2tabular(image_array))
+
+    for p in label_images_paths:
+        label_tabular = []
+        image_array = rio.open(p).read()
+        label_tabular.append(image2tabular(image_array))
+
+
+    pre_concatenated = np.concatenate(pre_tabular, 0)
+    post_concatenated = np.concatenate(post_tabular, 0)
+    label_concatenated = np.concatenate(label_tabular, 0)
+    difference_concatenated = pre_concatenated - post_concatenated
+
+    if configs['use_only_post_image?']:
+        return post_concatenated, label_concatenated
+    else:
+        return difference_concatenated, label_concatenated

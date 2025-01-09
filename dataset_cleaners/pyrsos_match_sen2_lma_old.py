@@ -43,14 +43,6 @@ def match_satellite_images(LMA_ds, sen2_ds, interp_method):
 
     return sen2_ds_reprojected
 
-def radiometric_clipping(sen2_bands):
-    clipped_sen2_bands = np.clip(sen2_bands, 0, 10000)
-    maxima = np.max(clipped_sen2_bands, axis=0)
-    minima = np.min(clipped_sen2_bands, axis=0)
-
-    linear_constrast_stretch_sen2_bands = np.floor(((clipped_sen2_bands-minima) / (maxima-minima)) * 255).astype(np.uint8)
-
-    return linear_constrast_stretch_sen2_bands
 
 
 if __name__ == '__main__':
@@ -79,8 +71,7 @@ if __name__ == '__main__':
 
     LMA_bands = LMA_ds.values
     realligned_sen2_bands = realligned_sen2_ds.values
-    radiometrically_reduced_sen2_bands = radiometric_clipping(realligned_sen2_bands)
-    realligned_sen2_bands_with_black_pixels = blackout(radiometrically_reduced_sen2_bands, LMA_bands)
+    realligned_sen2_bands_with_black_pixels = blackout(realligned_sen2_bands, LMA_bands)
 
     final_sen2_ds = realligned_sen2_ds
     final_sen2_ds.rio.write_nodata(None, inplace=True)

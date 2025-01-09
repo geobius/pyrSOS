@@ -6,8 +6,8 @@ from rasterio.features import rasterize
 import argparse
 from pathlib import Path
 
-def rasterize_mask(source_raster_path, shapefile_path, output_path):
-    vector_features = gpd.read_file(shapefile_path)
+def rasterize_mask(source_raster_path, geopackage_path, output_path):
+    vector_features = gpd.read_file(geopackage_path)
     geometries = vector_features.geometry
 
     with rio.open(source_raster_path) as source_ds:
@@ -47,10 +47,10 @@ if __name__ == '__main__':
                                      )
 
     parser.add_argument('source_raster_path', type=Path)
-    parser.add_argument('shapefile_path', type=Path)
+    parser.add_argument('geopackage_path', type=Path)
     parser.add_argument('destination_raster_path', type=Path)
    
     args = parser.parse_args()
     rasterize_mask(args.source_raster_path,
-                   args.shapefile_path,
+                   args.geopackage_path,
                    args.destination_raster_path)

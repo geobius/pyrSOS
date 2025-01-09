@@ -90,6 +90,14 @@ def read_learning_configs(configs_path):
         f"""{font_colors.RED}Error: augment? does not have a valid value.{font_colors.ENDC}
         A valid augment? value must be a bool"""
 
+    assert isinstance(configs['use_only_burned_patches?'], bool), \
+        f"""{font_colors.RED}Error: use_only_burned_patches? does not have a valid value.{font_colors.ENDC}
+        A valid use_only_burned_patches? value must be a boolean"""
+
+    valid_visualization_sets = ['training set', 'validation set', 'testing set']
+    assert configs['visualization_set'] in valid_visualization_sets, \
+        f"""{font_colors.RED}Error: No valid visualization_set is provided.{font_colors.ENDC}
+        A valid visualization_set must be one of the following {font_colors.BLUE}{valid_visualization_sets}{font_colors.BLUE}"""
 
     assert isinstance(configs['wandb_project'], str), \
         f"""{font_colors.RED}Error: wandb_project does not have a valid value.{font_colors.ENDC}
@@ -121,16 +129,8 @@ def read_learning_configs(configs_path):
         assert Path(configs['load_state_path']).exists(), \
         f"""{font_colors.RED}{font_colors.BOLD}The checkpoint path ({configs['load_state_path']}) does not exist!{font_colors.ENDC}"""
 
-
-    ds_path = Path(configs['dataset_path'])
-    assert (ds_path/configs['train']).exists(), \
-        f"""cannot find the training pickle file in {ds_path}"""
-
-    assert (ds_path/configs['val']).exists(), \
-        f"""cannot find the validation pickle file in {ds_path}"""
-
-    assert (ds_path/configs['test']).exists(), \
-        f"""cannot find the testing pickle file in {ds_path}"""
+    assert (Path(configs['dataset_path'])/configs['split_filename']).exists(), \
+        f"""{font_colors.RED}{font_colors.BOLD}The split_filename ({configs['split_filename']}) does not exist!{font_colors.ENDC}"""
 
     assert isinstance(configs['patch_width'], int), \
         f"""{font_colors.RED}Error: patch_width does not have a valid value.{font_colors.ENDC}
@@ -140,7 +140,7 @@ def read_learning_configs(configs_path):
         f"""{font_colors.RED}Error: patch_height does not have a valid value.{font_colors.ENDC}
         A valid patch height value must be an integer"""
 
-    valid_pre_data_sources = ["sen2_pre"]
+    valid_pre_data_sources = ["sen2"]
     assert configs['pre_data_source'] in valid_pre_data_sources, \
         f"""{font_colors.RED}Error: No valid pre data source is provided.{font_colors.ENDC}
         A valid pre data source must be one of the following {font_colors.BLUE}{valid_pre_data_sources}{font_colors.BLUE}"""
@@ -149,9 +149,9 @@ def read_learning_configs(configs_path):
         f"""{font_colors.RED}Error: pre_normalize? does not have a valid value.{font_colors.ENDC}
         A valid pre_normalize? value must be a boolean"""
 
-    assert isinstance(configs['pre_gsd_meters'], float), \
+    assert isinstance(configs['pre_gsd'], str), \
         f"""{font_colors.RED}Error: pre_gsd_meters does not have a valid value.{font_colors.ENDC}
-        A valid pre_gsd_meters value must be a float"""
+        A valid pre_gsd_meters value must be a string containing the number and the unit"""
 
     sel0 = configs['pre_selected_bands']
     assert isinstance(sel0, list) and all(isinstance(i, int) for i in sel0), \
@@ -159,7 +159,7 @@ def read_learning_configs(configs_path):
         A valid pre_selected_bands value must be a list of integers. Where each integer represents the index of the desired band in the pre image.
         Indexing starts from 1"""
 
-    valid_post_data_sources = ["sen2_post", "lma"]
+    valid_post_data_sources = ["sen2", "lma"]
     assert configs['post_data_source'] in valid_post_data_sources,  \
         f"""{font_colors.RED}Error: No valid post_data_source is provided.{font_colors.ENDC}
         A valid post_data_source must be one of the following {font_colors.BLUE}{valid_models}{font_colors.BLUE}"""
@@ -168,9 +168,9 @@ def read_learning_configs(configs_path):
         f"""{font_colors.RED}Error: post_normalize? does not have a valid value.{font_colors.ENDC}
         A valid post_normalize? value must be a boolean"""
 
-    assert isinstance(configs['post_gsd_meters'], float), \
+    assert isinstance(configs['post_gsd'], str), \
         f"""{font_colors.RED}Error: post_gsd_meters does not have a valid value.{font_colors.ENDC}
-        A valid post_gsd_meters value must be a float"""
+        A valid post_gsd_meters value must be a string containing the number and the unit"""
 
     sel1 = configs['post_selected_bands']
     assert isinstance(sel1, list) and all(isinstance(i, int) for i in sel1), \

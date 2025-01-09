@@ -1,5 +1,10 @@
 from torch.utils.data import dataloader
-from torchmetrics import metric
+from torchmetrics import MetricCollection
+from torchmetrics.classification import (
+    BinaryPrecision,
+    BinaryRecall,
+    BinaryF1Score,
+    BinaryJaccardIndex)
 from tqdm import tqdm
 import wandb
 import pyjson5
@@ -8,22 +13,21 @@ import numpy as np
 import torch
 import pdb
 from .initializers import (
-    init_metrics,
     init_loss,
     init_optimizer,
     init_lr_scheduler,
 )
 
 
-CLASS_LABELS = {0: 'Unburnt', 1: 'Burnt', 2: 'Other events'}
+CLASS_LABELS = {0: 'Unburnt', 1: 'Burnt'}
 
 
 def train1epoch(model, train_dataloader, loss_function, optimizer, scheduler, device):
     model.train()
 
     for (pre_images, post_images, labels, _) in tqdm(train_dataloader):
-        pre_images = pre_images.to(device=device)
-        post_images = post_images.to(device=device)
+        pre_images = pre_images.to(device=device, dtype=torch.float32)
+        post_images = post_images.to(device=device, dtype=torch.float32)
         labels = labels.to(device=device)
 
         optimizer.zero_grad()
@@ -36,17 +40,28 @@ def train1epoch(model, train_dataloader, loss_function, optimizer, scheduler, de
 
     return model
 
+def make_metrics_table():
+
+    pyrsos_metrics = MetricCollection({
+        "iou": BinaryJaccardIndex(),
+        "precision": BinaryPrecision(),
+        "recall": BinaryRecall(),
+        "f1": BinaryF1Score()
+    })
+
+    return pyrsos_metrics
+
 
 def eval1epoch(model, dataloader, loss_function, device):
     model.eval()
 
     total_batches = len(dataloader)
     running_loss = 0.0
-    metrics = init_metrics().to(device=device)
+    metrics = make_metrics_table().to(device=device)
     with torch.no_grad():
         for (pre_images, post_images, labels, _) in tqdm(dataloader):
-            pre_images = pre_images.to(device=device)
-            post_images = post_images.to(device=device)
+            pre_images = pre_images.to(device=device, dtype=torch.float32)
+            post_images = post_images.to(device=device, dtype=torch.float32)
             labels = labels.to(device=device)
 
             logit_outputs = model(pre_images, post_images)
@@ -64,16 +79,18 @@ def eval1epoch(model, dataloader, loss_function, device):
 
 
 def wandb_log_metrics(loss, metrics, learning_rate, epoch, rep_i, learning_stage, should_log):
-    iou_score = metrics['iou']
-    precision_score = metrics['precision']
-    recall_score = metrics['recall']
+    iou_score = metrics['iou'].item()
+    precision_score = metrics['precision'].item()
+    recall_score = metrics['recall'].item()
+    f1_score = metrics['f1'].item()
 
     log_dict = {
         f'({rep_i}) Epoch': epoch,
         f'({rep_i}) {learning_stage} Loss': loss,
-        f'({rep_i}) {learning_stage} IoU ({CLASS_LABELS[1]})': 100 * iou_score.item(),
-        f'({rep_i}) {learning_stage} Precision ({CLASS_LABELS[1]})': 100 * precision_score.item(),
-        f'({rep_i}) {learning_stage} Recall ({CLASS_LABELS[1]})': 100 * recall_score.item(),
+        f'({rep_i}) {learning_stage} IoU ({CLASS_LABELS[1]})': 100 * iou_score,
+        f'({rep_i}) {learning_stage} Precision ({CLASS_LABELS[1]})': 100 * precision_score,
+        f'({rep_i}) {learning_stage} Recall ({CLASS_LABELS[1]})': 100 * recall_score,
+        f'({rep_i}) {learning_stage} F1 ({CLASS_LABELS[1]})': 100 * f1_score,
         f'({rep_i}) lr': learning_rate
             }
     if should_log:

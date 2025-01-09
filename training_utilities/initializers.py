@@ -5,13 +5,11 @@ from numpy import average
 import torch
 import torch.nn as nn
 from torch.utils import checkpoint
-from torchmetrics import MetricCollection
 from itertools import chain
 import rasterio as rio
-from torchmetrics.classification import BinaryPrecision, BinaryRecall, BinaryJaccardIndex
 import wandb
-
-from .config_parsers import font_colors
+from torch.utils.data import DataLoader
+import pyjson5
 
 from models.fc_ef_conc import FC_EF_conc
 from models.fc_ef_diff import FC_EF_diff
@@ -27,7 +25,7 @@ from models.bam_cd.model import BAM_CD
 from losses.dice import DiceLoss
 from losses.bce_and_dice import BCEandDiceLoss
 
-
+from training_utilities.dataloaders import Burned_Area_Sampler
 
 def save_checkpoint(checkpoint_path, loss, model, optimizer, lr_scheduler):
 
@@ -52,7 +50,6 @@ def load_checkpoint(checkpoint_path):
 def name_checkpoint(parent_folder, epoch):
     path = parent_folder / f'checkpoint_epoch={epoch}.pt'
     return path
-
 
 
 def init_new_checkpoints_folder(configs):
@@ -102,6 +99,12 @@ def init_wandb(configs, model_configs):
                    reinit=True)
 
     return
+
+def init_train_loader(train_dataset, configs):
+    if configs['use_only_burned_patches?']:
+        return DataLoader(train_dataset, num_workers=configs['#workers'], batch_size=configs['batch_size'], sampler=Burned_Area_Sampler(train_dataset), pin_memory=True)
+    else:
+        return DataLoader(train_dataset, num_workers=configs['#workers'], batch_size=configs['batch_size'], shuffle=True, pin_memory=True)
 
 
 def init_model(model_name, model_configs, checkpoint, patch_width, inp_channels):
@@ -166,17 +169,19 @@ def compute_class_weights(configs):
         patch_width = configs['patch_width']
         patch_height = configs['patch_height']
 
-        burnt = {'train': 0, 'val': 0, 'test': 0}
-        unburnt = {'train': 0, 'val': 0, 'test': 0}
+        burnt = {'training set': 0, 'validation set': 0, 'testing set': 0}
+        unburnt = {'training set': 0, 'validation set': 0, 'testing set': 0}
 
-        for mode in ['train', 'val', 'test']:
-            pickle_path = Path(configs['dataset_path']) / configs[mode]
-            pickle_file = pickle.load(open(pickle_path, 'rb'))
-            merged_patches = [item for sublist in pickle_file.values() for item in sublist]
+        for mode in ['training set', 'validation set', 'testing set']:
+            ds_path = Path(configs['dataset_path'])
+            splits = pyjson5.load(open(ds_path / configs['split_filename'], 'r'))
+            areas_in_the_set = splits[mode]
+            label_paths_per_area = [list((ds_path/area).glob('*label_*.tif')) for area in areas_in_the_set]
+            merged_label_paths = [item for sublist in label_paths_per_area for item in sublist]
 
-            for patch in merged_patches:
-                if 'positive' in patch['label'].stem:
-                    with rio.open(patch['label']) as label:
+            for patch in merged_label_paths:
+                if 'positive' in patch.stem:
+                    with rio.open(patch) as label:
                         mask_band = label.read(1).flatten()
                         patch_unburnt = sum(mask_band == 0) #count zeros
                         patch_burnt = patch_width * patch_height - patch_unburnt #the remaining pixels
@@ -188,30 +193,20 @@ def compute_class_weights(configs):
                     unburnt[mode] += (patch_width * patch_height)
 
         return {
-            'train': ((burnt['train'] + unburnt['train']) / (2 * unburnt['train']),
-                      (burnt['train'] + unburnt['train']) / (2 * burnt['train'])),
-            'val': ((burnt['val'] + unburnt['val']) / (2 * unburnt['val']),
-                    (burnt['val'] + unburnt['val']) / (2 * burnt['val'])),
-            'test': ((burnt['test'] + unburnt['test']) / (2 * unburnt['test']),
-                     (burnt['test'] + unburnt['test']) / (2 * burnt['test']))
+            'training set': ((burnt['training set'] + unburnt['training set']) / (2 * unburnt['training set']),
+                      (burnt['training set'] + unburnt['training set']) / (2 * burnt['training set'])),
+            'validation set': ((burnt['validation set'] + unburnt['validation set']) / (2 * unburnt['validation set']),
+                    (burnt['validation set'] + unburnt['validation set']) / (2 * burnt['validation set'])),
+            'testing set': ((burnt['testing set'] + unburnt['testing set']) / (2 * unburnt['testing set']),
+                     (burnt['testing set'] + unburnt['testing set']) / (2 * burnt['testing set']))
         }
     else:
         return {
-            'train': (1, 1),
-            'val': (1, 1),
-            'test': (1, 1)
+            'training set': (1, 1),
+            'validation set': (1, 1),
+            'testing set': (1, 1)
         }
 
-
-def init_metrics():
-
-    pyrsos_metrics = MetricCollection({
-        "iou": BinaryJaccardIndex(),
-        "precision": BinaryPrecision(),
-        "recall": BinaryRecall()
-    })
-
-    return pyrsos_metrics
 
 
 

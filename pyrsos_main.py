@@ -31,8 +31,9 @@ from training_utilities.initializers import (
     reset_or_continue,
     init_model,
     compute_class_weights,
+    init_train_loader,
     init_loss,
-    init_wandb,
+    init_wandb
 )
 from training_utilities.dataloaders import Pyrsos_Dataset, Burned_Area_Sampler
 from training_utilities.learning_loops import (
@@ -41,7 +42,7 @@ from training_utilities.learning_loops import (
     wandb_log_metrics
 )
 
-from training_utilities.prediction_visualization import convolutional_classifier_visualizer
+from training_utilities.prediction_visualization import convolutional_visualizer
 
 
 parser = argparse.ArgumentParser()
@@ -51,7 +52,7 @@ parser.add_argument('--config_folder', type=Path, default='configs/', required=F
 
 args = parser.parse_args()
 
-general_configs_path = args.config_folder/'general_config.json'
+general_configs_path = args.config_folder/'convolutional_config.json'
 configs = read_learning_configs(general_configs_path)
 
 model_configs_path = args.config_folder/'method'/ (configs['model'] + '.json')
@@ -69,35 +70,27 @@ class_weights = compute_class_weights(configs)
 save_every = configs['save_every_n_epochs']
 last_epoch = starting_epoch + configs['#epochs']
 
-train_dataset = Pyrsos_Dataset('train', configs)
-val_dataset = Pyrsos_Dataset('val', configs)
-test_dataset = Pyrsos_Dataset('test', configs)
-
-train_sampler = Burned_Area_Sampler(train_dataset)
-
+train_dataset = Pyrsos_Dataset('training set', configs)
+val_dataset = Pyrsos_Dataset('validation set', configs)
+test_dataset = Pyrsos_Dataset('testing set', configs)
 
 
 if configs['learning_stage'] == 'train':
-    train_loader = DataLoader(train_dataset, num_workers=configs['#workers'], batch_size=configs['batch_size'], sampler=train_sampler, pin_memory=True)
+    train_loader = init_train_loader(train_dataset, configs)
     val_loader = DataLoader(val_dataset, num_workers=configs['#workers'], batch_size=configs['batch_size'], shuffle=True, pin_memory=True)
-    test_loader = DataLoader(test_dataset, num_workers=configs['#workers'], batch_size=configs['batch_size'], shuffle=True, pin_memory=True)
 
-    print(f'{font_colors.CYAN}Using {configs["loss_function"]} with class weights: {class_weights["train"]}.{font_colors.ENDC}')
+    print(f'{font_colors.CYAN}Using {configs["loss_function"]} with class weights: {class_weights["training set"]}.{font_colors.ENDC}')
 
     for rep_i in range(configs['#training_repetitions']):
         print(f'\n===== REP {rep_i} =====\n')
 
         model = init_model(model_name, model_configs, state_dictionaries, patch_width, number_of_channels).to(device=configs['device'])
-        train_criterion = init_loss(loss_function_name, class_weights['train'], model_configs).to(device=configs['device'])
-        val_criterion = init_loss(loss_function_name, class_weights['val'], model_configs).to(device=configs['device'])
-        test_criterion = init_loss(loss_function_name, class_weights['test'], model_configs).to(device=configs['device'])
+        train_criterion = init_loss(loss_function_name, class_weights['training set'], model_configs).to(device=configs['device'])
+        val_criterion = init_loss(loss_function_name, class_weights['validation set'], model_configs).to(device=configs['device'])
         optimizer = init_optimizer(model, state_dictionaries, configs, model_configs)
         lr_scheduler = init_lr_scheduler(optimizer, state_dictionaries, configs, model_configs)
         wandb = init_wandb(configs, model_configs)
 
-        best_model = {}
-        best_val_loss = 999999
-        best_epoch = 0
 
         for epoch in range(starting_epoch, last_epoch):
             print(f'=== Epoch: {epoch} ===')
@@ -106,16 +99,20 @@ if configs['learning_stage'] == 'train':
             model = train1epoch(model, train_loader, train_criterion, optimizer, lr_scheduler, configs['device']) #update the weights
             learning_rate = (lr_scheduler.get_last_lr())[0]
 
-            print('---Validating for Underfitting---')
-            train_loss, train_metrics = eval1epoch(model, train_loader, train_criterion, configs['device'])  #metrics for underfitting checks.
-            print(f'Mean Train Loss: {train_loss:.6f}')
-            wandb_log_metrics(train_loss, train_metrics, learning_rate, epoch, rep_i, 'train', configs['wandb_activate?'])
+            #print('---Validating for Underfitting---')
+            #train_loss, train_metrics = eval1epoch(model, train_loader, train_criterion, configs['device'])  #metrics for underfitting checks.
+            #print(f'Mean Train Loss: {train_loss:.6f}')
+            #wandb_log_metrics(train_loss, train_metrics, learning_rate, epoch, rep_i, 'train', configs['wandb_activate?'])
 
             print('---Validating for Overfitting---')
             val_loss, val_metrics = eval1epoch(model, val_loader, val_criterion, configs['device'])  #metrics for overfitting checks.
             print(f'Mean Validation Loss: {val_loss:.6f}')
             wandb_log_metrics(val_loss, val_metrics, learning_rate, epoch, rep_i, 'validation', configs['wandb_activate?'])
 
+            #this is a saving mechanism for keeping track of the current best state of the model as its weights change.
+            best_model = {}
+            best_val_loss = 999999
+            best_epoch = 0
             if val_loss < best_val_loss:
                 best_val_loss = val_loss
                 best_model = model
@@ -126,31 +123,27 @@ if configs['learning_stage'] == 'train':
                 new_checkpoint_path = checkpoints_folder / f'{rep_i}' / f'checkpoint_epoch={best_epoch}.pt'
                 save_checkpoint(new_checkpoint_path, best_val_loss, best_model, optimizer, lr_scheduler)
 
-        print('---Validating on test data---')
-        test_loss, test_metrics = eval1epoch(model, test_loader, test_criterion, configs['device'])  #metrics for overfitting checks.
-        print(f'Mean Testing Loss: {test_loss:.6f}')
-        print(f'metrics: {test_metrics}')
-        wandb_log_metrics(test_loss, test_metrics, learning_rate, epoch, rep_i, 'testing', configs['wandb_activate?'])
 
 
 
 if configs['learning_stage'] == 'eval':
+    #It is assumed that you have already trained the model and have kept the best weights.
+    #Now we are checking the metrics across every set to log them in my technical essay.
+    #and visualizing the model output masks
+    train_loader = init_train_loader(train_dataset, configs)
+    val_loader = DataLoader(val_dataset, num_workers=configs['#workers'], batch_size=configs['batch_size'], shuffle=True, pin_memory=True)
     test_loader = DataLoader(test_dataset, num_workers=configs['#workers'], batch_size=configs['batch_size'], shuffle=True, pin_memory=True)
-    test_criterion = init_loss(loss_function_name, class_weights['test'], model_configs).to(device=configs['device'])
+
+    train_criterion = init_loss(loss_function_name, class_weights['training set'], model_configs).to(device=configs['device'])
+    val_criterion = init_loss(loss_function_name, class_weights['validation set'], model_configs).to(device=configs['device'])
+    test_criterion = init_loss(loss_function_name, class_weights['testing set'], model_configs).to(device=configs['device'])
     model = init_model(model_name, model_configs, state_dictionaries, patch_width, number_of_channels).to(device=configs['device'])
+
+    training_loss, training_metrics = eval1epoch(model, train_loader, train_criterion, configs['device'])  #metrics for overfitting checks.
+    validation_loss, validation_metrics = eval1epoch(model, val_loader, val_criterion, configs['device'])  #metrics for overfitting checks.
     test_loss, test_metrics = eval1epoch(model, test_loader, test_criterion, configs['device'])  #metrics for overfitting checks.
 
-    print(f'Mean Testing Loss: {test_loss:.6f}')
-    print(f'metrics: {test_metrics}')
-    vis = convolutional_classifier_visualizer(model, 'val', configs)
-
-
-    #wandb = init_wandb(configs, model_configs)
-
-    #for dataset in [test_dataset, val_dataset, test_dataset]:
-        #for area in dataset.areas_in_the_set:
-         #   loader = create_dataloader_from_area(dataset, area) #create a subset of the train dataset that
-          #  #only contains the area I want and puts it into dataloader
-           # fullmask = draw(loader,model)
-
-    #send the numpy arrays to wandb and save them as rasters to the results folder
+    print(f'Mean Training Loss: {training_loss:.6f} metrics: {training_metrics}')
+    print(f'Mean Validation Loss: {validation_loss:.6f} metrics: {validation_metrics}')
+    print(f'Mean Testing Loss: {test_loss:.6f} metrics: {test_metrics}')
+    vis = convolutional_visualizer(configs, model)

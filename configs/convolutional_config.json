@@ -1,0 +1,44 @@
+{
+    "model": "fc_ef_conc",
+    "learning_stage": "train",//train or eval
+    "#workers": 2,
+    "seed": 999,
+    "device": "cuda",
+    "batch_size": 2,
+
+    "#epochs": 2,
+    "#training_repetitions": 1,
+    "save_every_n_epochs": 25,
+    "loss_function": "cross_entropy",
+    "weighted_loss?": true,
+    "augment?": false,
+    "use_only_burned_patches?": true,
+    "visualization_set": "training set",
+
+    "wandb_project": "pretraining",
+    "wandb_entity": "",
+    "wandb_id": "",
+    "wandb_resume?": false,
+    "wandb_activate?":false,
+
+    "dataset_path": "/mnt/7EBA48EEBA48A48D/examhno10/ptyhiakh/pyrsos/patches128/",
+    "results_path": "/mnt/7EBA48EEBA48A48D/examhno10/ptyhiakh/pyrsos/results/",
+    "load_state_path": null,
+    "split_filename": "event_splits_v1.json",
+
+    
+    "patch_width": 256,
+    "patch_height": 256,
+
+    "pre_data_source": "sen2", //only option
+    "pre_normalize?": true,
+    "pre_gsd": "250cm",
+    "pre_selected_bands": [3,4,6,7],
+
+    "post_data_source": "lma", //lma or sen2
+    "post_normalize?": true,
+    "post_gsd": "250cm",
+    "post_selected_bands": [1,2,3,4]
+}
+
+
