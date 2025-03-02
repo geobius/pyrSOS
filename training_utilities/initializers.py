@@ -46,47 +46,24 @@ def load_checkpoint(checkpoint_path):
     else:
         return {}
 
-
-def name_checkpoint(parent_folder, epoch):
-    path = parent_folder / f'checkpoint_epoch={epoch}.pt'
-    return path
-
-
-def init_new_checkpoints_folder(configs):
-    checkpoints_path = None
-    run_timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-    checkpoints_path = Path(configs['results_path']) / configs['model'] / run_timestamp / 'checkpoints'
-    checkpoints_path.mkdir(exist_ok=True, parents=True)
-
-    return checkpoints_path
-
 def parse_epoch_from_checkpoint_filename(checkpoint_path):
     epoch = int(checkpoint_path.stem.split('epoch=')[1]) + 1
     return epoch
 
 
 def reset_or_continue(configs):
-    #return a path, a state dictionary and an epoch
+    #return a path, the state dictionaries and an epoch value
+    save_folder = Path(configs['save_state_folderpath'])
+    save_folder.mkdir(exist_ok=True, parents=True)
 
-    if configs['load_state_path'] is None:
-        checkpoints_folder = init_new_checkpoints_folder(configs)
-        state_dictionary = {}
-        starting_epoch = 0
-
-        return checkpoints_folder, state_dictionary, starting_epoch
-
-    checkpoint_path = Path(configs['load_state_path'])
-    if checkpoint_path.exists():
-        checkpoints_folder = checkpoint_path.parent
-        state_dictionary = load_checkpoint(checkpoint_path)
-        starting_epoch = parse_epoch_from_checkpoint_filename(checkpoint_path)
-
-        return checkpoints_folder, state_dictionary, starting_epoch
-
+    if configs['load_state_filepath'] is None:
+        return save_folder, {}, 0
     else:
-        Exception("""This file does not exist. If you want to start anew replace the
-        load_state_path json config with a none value. If you want to continue
-        from some checkpoint you must provide a valid path""")
+        checkpoint_filepath = Path(configs['load_state_filepath'])
+        state_dictionaries = load_checkpoint(checkpoint_filepath)
+        starting_epoch = parse_epoch_from_checkpoint_filename(checkpoint_filepath)
+
+        return save_folder, state_dictionaries, starting_epoch
 
 
 def init_wandb(configs, model_configs):
@@ -112,11 +89,11 @@ def init_model(model_name, model_configs, checkpoint, patch_width, inp_channels)
     model = None
     match model_name:
         case 'fc_ef_conc':
-            model = FC_EF_conc(input_nbr=inp_channels, label_nbr=2)
+            model = FC_EF_conc(input_nbr=inp_channels, label_nbr=2)#label_nbr means number of labels
         case 'fc_ef_diff':
             model = FC_EF_diff(input_nbr=inp_channels, label_nbr=2)
         case 'unet':
-            model = Unet(input_nbr=inp_channels, label_nbr=2)
+            model = Unet(n_channels=2*inp_channels, n_labels=2, depth=model_configs['depth'])
         case 'adhr_cdnet':
             model = ADHR(in_channels=inp_channels, num_classes=2)
         case 'snunet':
@@ -173,8 +150,8 @@ def compute_class_weights(configs):
         unburnt = {'training set': 0, 'validation set': 0, 'testing set': 0}
 
         for mode in ['training set', 'validation set', 'testing set']:
-            ds_path = Path(configs['dataset_path'])
-            splits = pyjson5.load(open(ds_path / configs['split_filename'], 'r'))
+            ds_path = Path(configs['dataset_folderpath'])
+            splits = pyjson5.load(open(configs['event_split_filepath'], 'r'))
             areas_in_the_set = splits[mode]
             label_paths_per_area = [list((ds_path/area).glob('*label_*.tif')) for area in areas_in_the_set]
             merged_label_paths = [item for sublist in label_paths_per_area for item in sublist]

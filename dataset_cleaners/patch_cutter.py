@@ -133,78 +133,27 @@ def export_1image(filepath, destination_folder, patch_height, patch_width):
 
 
 
-def export_patches(source_folder, base_out_path, patch_height, patch_width):
-    all_events = [folder.stem for folder in source_folder.iterdir() if folder.is_dir()]
-    for event in all_events:
-        event_files = (source_folder/event).glob('*.tif')
-        for current_file in event_files:
-            print(f'processing {current_file}')
-            export_1image(current_file, base_out_path/event, patch_height, patch_width)
-
-    return
-
-
-def split_dataset(base_out_path, optional_prefix, seed):
-    all_events = [folder.stem for folder in base_out_path.iterdir() if folder.is_dir()]
-    random.seed(seed)
-    main_events = random.sample(all_events, k=3)
-
-    test_events = [e for e in all_events if e not in main_events]
-    validation_events = random.choices(main_events, k=1)
-    training_events = [e for e in main_events if e not in validation_events]
-
-    all_splits = {
-        'training set': training_events,
-        'validation set': validation_events,
-        'testing set': test_events
-    }
-   
-    json_split_name = f'event_splits_{optional_prefix}.json'
-    pyjson5.dump(all_splits, open(base_out_path/json_split_name, 'wb'))
-
-    return
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=
-    """This program works in 3 modes.
-    In mode 1: All raster images are split into equally sized patches.
-    In mode 2: A json5 file is created denoting which areas will be used for training, validation and testing.
-    Mode 3: It is mode 1 followed by mode 2. This is the default mode.""")
+    """This program splits raster images into equally sized patches.""")
 
     parser.add_argument('--dataset_path', type=Path, default='/mnt/7EBA48EEBA48A48D/examhno10/ptyhiakh/pyrsos/pyrsos_250cm_dataset')
     parser.add_argument('--base_out_path', type=Path, default='/mnt/7EBA48EEBA48A48D/examhno10/ptyhiakh/pyrsos/destination')
     parser.add_argument('--patch_width', type=int, default=128)
     parser.add_argument('--patch_height', type=int, default=128)
-    parser.add_argument('--prefix', type=str, default='v1')
-    parser.add_argument('--seed', type=int, default=29)
-    parser.add_argument('--mode', type=int, default=3)
+
     args = parser.parse_args()
 
-    if args.mode == 1:
-        args.base_out_path.mkdir(parents=True, exist_ok=True)
-        all_events = [folder.stem for folder in args.dataset_path.iterdir() if folder.is_dir()]
-        for event in all_events:
-            folderpath = args.base_out_path/event
-            folderpath.mkdir(parents=True, exist_ok=True)
+    args.base_out_path.mkdir(parents=True, exist_ok=True)
+    all_events = [folder.stem for folder in args.dataset_path.iterdir() if folder.is_dir()]
+    for event in all_events:
+        source_folder = args.dataset_path/event 
+        destination_folder = args.base_out_path/event
+        destination_folder.mkdir(parents=True, exist_ok=True)
 
-        export_patches(args.dataset_path,
-                       args.base_out_path,
-                       args.patch_height,
-                       args.patch_width)
+        event_files = source_folder.glob('*.tif')
+        for current_file in event_files:
+            print(f'processing {current_file}')
+            export_1image(current_file, destination_folder, args.patch_height, args.patch_width)
 
-    if args.mode == 2:
-        split_dataset(args.base_out_path, args.prefix, args.seed)
-
-    if args.mode == 3:
-        args.base_out_path.mkdir(parents=True, exist_ok=True)
-        all_events = [folder.stem for folder in args.dataset_path.iterdir() if folder.is_dir()]
-        for event in all_events:
-            folderpath = args.base_out_path/event
-            folderpath.mkdir(parents=True, exist_ok=True)
-
-        export_patches(args.dataset_path,
-                       args.base_out_path,
-                       args.patch_height,
-                       args.patch_width)
-
-        split_dataset(args.base_out_path, args.prefix, args.seed)
+            

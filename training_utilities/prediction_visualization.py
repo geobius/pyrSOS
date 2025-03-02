@@ -16,7 +16,7 @@ from training_utilities.dataloaders import substitute_names, Pyrsos_Dataset
 
 
 #configs_filepath = Path('/mnt/7EBA48EEBA48A48D/examhno10/ptyhiakh/pyrsos/python_scripts/configs/pixel_config.json')
-configs2 = pyjson5.load(open(Path('/mnt/7EBA48EEBA48A48D/examhno10/ptyhiakh/pyrsos/python_scripts/configs/convolutional_config.json'), 'r'))
+#configs2 = pyjson5.load(open(Path('/mnt/7EBA48EEBA48A48D/examhno10/ptyhiakh/pyrsos/python_scripts/configs/convolutional_config.json'), 'r'))
 
 
 
@@ -94,9 +94,9 @@ class pixel_visualizer():
 
         burnt_scheme = ListedColormap(['black', 'orange'])
         _, height, width = post_patch.shape
-        left, top = transform * (0, 0)
-        right, bottom = transform * (width, height)
-        image_extent = (left, right, bottom, top)
+        #left, top = transform * (0, 0)
+        #right, bottom = transform * (width, height)
+        #image_extent = (left, right, bottom, top)
 
         for ax in self.axes:
             ax.clear()
@@ -104,23 +104,21 @@ class pixel_visualizer():
         pre_patch_visual = np.transpose(pre_patch,
                                         (1, 2, 0))[:, :, [3, 1, 0]]
         self.axes[0].set_title('pre patch')
-        self.axes[0].imshow(pre_patch_visual, extent=image_extent)
+        self.axes[0].imshow(pre_patch_visual)
 
 
         post_patch_visual = np.transpose(post_patch,
                                          (1, 2, 0))[:, :, [3, 1, 0]]
         self.axes[1].set_title('post patch')
-        self.axes[1].imshow(post_patch_visual, extent=image_extent)
+        self.axes[1].imshow(post_patch_visual)
 
 
         self.axes[2].set_title('manual label')
-        self.axes[2].imshow(label_patch,
-                            extent=image_extent, cmap=burnt_scheme)
+        self.axes[2].imshow(label_patch, cmap=burnt_scheme)
 
         if prediction_mask is not None:
             self.axes[3].set_title('model prediction')
-            self.axes[3].imshow(prediction_mask,
-                                extent=image_extent, cmap=burnt_scheme)
+            self.axes[3].imshow(prediction_mask, cmap=burnt_scheme)
 
         self.fig.canvas.draw()
 
@@ -193,9 +191,9 @@ class convolutional_visualizer():
 
         burnt_scheme = ListedColormap(['black', 'orange'])
         _, height, width = post_patch.shape
-        left, top = transform * (0, 0)
-        right, bottom = transform * (width, height)
-        image_extent = (left, right, bottom, top)
+        #left, top = transform * (0, 0)
+        #right, bottom = transform * (width, height)
+        #image_extent = (left, right, bottom, top)
 
         for ax in self.axes:
             ax.clear()
@@ -203,23 +201,21 @@ class convolutional_visualizer():
         pre_patch_visual = np.transpose(pre_patch,
                                         (1, 2, 0))[:, :, [3, 1, 0]]
         self.axes[0].set_title('pre patch')
-        self.axes[0].imshow(pre_patch_visual, extent=image_extent)
+        self.axes[0].imshow(pre_patch_visual)
 
 
         post_patch_visual = np.transpose(post_patch,
                                          (1, 2, 0))[:, :, [3, 1, 0]]
         self.axes[1].set_title('post patch')
-        self.axes[1].imshow(post_patch_visual, extent=image_extent)
+        self.axes[1].imshow(post_patch_visual)
 
 
         self.axes[2].set_title('manual label')
-        self.axes[2].imshow(label_patch,
-                            extent=image_extent, cmap=burnt_scheme)
+        self.axes[2].imshow(label_patch, cmap=burnt_scheme)
 
         if prediction_mask is not None:
             self.axes[3].set_title('model prediction')
-            self.axes[3].imshow(prediction_mask,
-                                extent=image_extent, cmap=burnt_scheme)
+            self.axes[3].imshow(prediction_mask, cmap=burnt_scheme)
 
         self.fig.canvas.draw()
 

@@ -47,18 +47,20 @@ from training_utilities.prediction_visualization import convolutional_visualizer
 
 parser = argparse.ArgumentParser()
 
-parser.add_argument('--config_folder', type=Path, default='configs/', required=False,
-                        help='The config folder to use. Default "configs/.')
+parser.add_argument('--configs_filepath', type=Path, default='configs/convolutional_config.json',
+                    required=False,
+                    help='The config file to use. Default "configs/convolutional_config.json"')
 
 args = parser.parse_args()
 
-general_configs_path = args.config_folder/'convolutional_config.json'
-configs = read_learning_configs(general_configs_path)
+general_configs_filepath = args.configs_filepath
+#configs = read_learning_configs(general_configs_path) this does checks
+configs = pyjson5.load(open(general_configs_filepath)) #this is a quickie
 
-model_configs_path = args.config_folder/'method'/ (configs['model'] + '.json')
-model_configs = pyjson5.load(open(model_configs_path,'r'))
+model_configs_path = Path(configs['specific_hyperparameters_filepath'])#that way I can have multiple files of hyperparameters
+model_configs = pyjson5.load(open(model_configs_path, 'r'))
 
-checkpoints_folder, state_dictionaries, starting_epoch = reset_or_continue(configs)
+save_folder, state_dictionaries, starting_epoch = reset_or_continue(configs) #now I can choose where checkpoints are saved
 
 model_name = configs['model']
 patch_width = configs['patch_width']
@@ -81,48 +83,50 @@ if configs['learning_stage'] == 'train':
 
     print(f'{font_colors.CYAN}Using {configs["loss_function"]} with class weights: {class_weights["training set"]}.{font_colors.ENDC}')
 
-    for rep_i in range(configs['#training_repetitions']):
-        print(f'\n===== REP {rep_i} =====\n')
+    model = init_model(model_name, model_configs, state_dictionaries, patch_width, number_of_channels).to(device=configs['device'])
+    train_criterion = init_loss(loss_function_name, class_weights['training set'], model_configs).to(device=configs['device'])
+    val_criterion = init_loss(loss_function_name, class_weights['validation set'], model_configs).to(device=configs['device'])
+    optimizer = init_optimizer(model, state_dictionaries, configs, model_configs)
+    lr_scheduler = init_lr_scheduler(optimizer, state_dictionaries, configs, model_configs)
+    wandb = init_wandb(configs, model_configs)
 
-        model = init_model(model_name, model_configs, state_dictionaries, patch_width, number_of_channels).to(device=configs['device'])
-        train_criterion = init_loss(loss_function_name, class_weights['training set'], model_configs).to(device=configs['device'])
-        val_criterion = init_loss(loss_function_name, class_weights['validation set'], model_configs).to(device=configs['device'])
-        optimizer = init_optimizer(model, state_dictionaries, configs, model_configs)
-        lr_scheduler = init_lr_scheduler(optimizer, state_dictionaries, configs, model_configs)
-        wandb = init_wandb(configs, model_configs)
+    best_model = {}
+    best_f1_score = 0.0 #in percentage
+    best_epoch = 0
 
+    for epoch in range(starting_epoch, last_epoch):
+        print(f'=== Epoch: {epoch} ===')
+        print('---BackPropagation---')
+        model = train1epoch(model, train_loader, train_criterion, optimizer, lr_scheduler, configs['device']) #update the weights
+        learning_rate = (lr_scheduler.get_last_lr())[0]
 
-        for epoch in range(starting_epoch, last_epoch):
-            print(f'=== Epoch: {epoch} ===')
+        print('---observing the mean training curve curve at the end of the epoch---')
+        train_loss, train_metrics = eval1epoch(model, train_loader, train_criterion, configs['device'])  #metrics for underfitting checks.
+        print(f'Mean Train Loss: {train_loss:.6f}')
+        wandb_log_metrics(train_loss, train_metrics, learning_rate, epoch, 'train', configs['wandb_activate?'])
 
-            print('---BackPropagation---')
-            model = train1epoch(model, train_loader, train_criterion, optimizer, lr_scheduler, configs['device']) #update the weights
-            learning_rate = (lr_scheduler.get_last_lr())[0]
-
-            #print('---Validating for Underfitting---')
-            #train_loss, train_metrics = eval1epoch(model, train_loader, train_criterion, configs['device'])  #metrics for underfitting checks.
-            #print(f'Mean Train Loss: {train_loss:.6f}')
-            #wandb_log_metrics(train_loss, train_metrics, learning_rate, epoch, rep_i, 'train', configs['wandb_activate?'])
-
-            print('---Validating for Overfitting---')
-            val_loss, val_metrics = eval1epoch(model, val_loader, val_criterion, configs['device'])  #metrics for overfitting checks.
-            print(f'Mean Validation Loss: {val_loss:.6f}')
-            wandb_log_metrics(val_loss, val_metrics, learning_rate, epoch, rep_i, 'validation', configs['wandb_activate?'])
+        print('---Validating for Overfitting---')
+        val_loss, val_metrics = eval1epoch(model, val_loader, val_criterion, configs['device'])  #metrics for overfitting checks.
+        print(f'Mean Validation Loss: {val_loss:.6f}')
+        wandb_log_metrics(val_loss, val_metrics, learning_rate, epoch, 'validation', configs['wandb_activate?'])
 
             #this is a saving mechanism for keeping track of the current best state of the model as its weights change.
-            best_model = {}
-            best_val_loss = 999999
-            best_epoch = 0
-            if val_loss < best_val_loss:
-                best_val_loss = val_loss
-                best_model = model
-                best_epoch = epoch
+        f1_score = val_metrics['f1'].item()*100 #in percentage
+        if f1_score > best_f1_score:
+            best_f1_score = f1_score
+            best_model = model
+            best_epoch = epoch
 
-            if (save_every > 0 and epoch % save_every == 0) or (epoch == last_epoch-1):
-                (checkpoints_folder / f'{rep_i}').mkdir(parents=True, exist_ok=True)
-                new_checkpoint_path = checkpoints_folder / f'{rep_i}' / f'checkpoint_epoch={best_epoch}.pt'
-                save_checkpoint(new_checkpoint_path, best_val_loss, best_model, optimizer, lr_scheduler)
+            previous_best_file = list(save_folder.glob('best_epoch*.pt'))
+            for file in previous_best_file:
+                file.unlink()
+            new_checkpoint_path = save_folder / f'best_epoch={best_epoch}.pt'
+            save_checkpoint(new_checkpoint_path, val_loss, best_model, optimizer, lr_scheduler)
 
+
+        if (save_every > 0 and epoch % save_every == 0) or (epoch == last_epoch - 1):
+            new_checkpoint_path = save_folder / f'checkpoint_epoch={epoch}.pt'
+            save_checkpoint(new_checkpoint_path, val_loss, model, optimizer, lr_scheduler)
 
 
 

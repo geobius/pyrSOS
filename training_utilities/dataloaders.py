@@ -57,8 +57,8 @@ def substitute_names(label_patches_paths, platform, pre_or_post):
 class Pyrsos_Dataset(Dataset):
     def __init__(self, mode, configs):
 
-        ds_path = Path(configs['dataset_path'])
-        splits = pyjson5.load(open(ds_path / configs['split_filename'], 'r'))
+        ds_path = Path(configs['dataset_folderpath'])
+        splits = pyjson5.load(open(configs['event_split_filepath'], 'r'))
 
         self.configs = configs
         self.mode = mode
@@ -98,7 +98,7 @@ class Pyrsos_Dataset(Dataset):
             label_aug = TF.vflip(label_aug)
 
         if random.random() > 0.5:
-            angle = random.uniform(-15, 15)
+            angle = random.uniform(-5, 5)
             pre_aug = TF.rotate(pre_aug, angle=angle)
             post_aug = TF.rotate(post_aug, angle=angle)
             label_aug = TF.rotate(label_aug.unsqueeze(0), angle=angle).squeeze()
@@ -142,6 +142,10 @@ class Pyrsos_Dataset(Dataset):
 
         if self.configs['augment?'] and self.mode == 'training set':
             pre_image, post_image, label_image = self.augment(pre_image, post_image, label_image)
+        if self.configs['pre_normalize?']:
+            pre_image = pre_image / 255
+        if self.configs['post_normalize?']:
+            post_image = post_image / 255
 
         return pre_image, post_image, label_image, transform
 
@@ -185,11 +189,10 @@ def tabular2image(tabular_array, height, width):
     return image_array
 
 
-def load_dataset_as_table(mode, pixel_configs_path):
+def load_dataset_as_table(mode, pixel_configs):
 
-    configs = pyjson5.load(open(pixel_configs_path, 'r'))
-    source_dataset_path = Path(configs['dataset_path'])
-    split_filename = configs['split_filename']
+    source_dataset_path = Path(pixel_configs['dataset_path'])
+    split_filename = pixel_configs['split_filename']
 
     splits = pyjson5.load(open(source_dataset_path / split_filename, 'r'))
     areas_in_the_set = splits[mode]
@@ -197,10 +200,10 @@ def load_dataset_as_table(mode, pixel_configs_path):
     label_paths_per_area = [list((source_dataset_path/area).glob('*label.tif')) for area in areas_in_the_set]
     merged_label_paths = [item for sublist in label_paths_per_area for item in sublist]
 
-    pre_platform = configs['pre_data_source']
-    pre_selected_bands = configs['pre_selected_bands']
-    post_platform = configs['post_data_source']
-    post_selected_bands = configs['post_selected_bands']
+    pre_platform = pixel_configs['pre_data_source']
+    pre_selected_bands = pixel_configs['pre_selected_bands']
+    post_platform = pixel_configs['post_data_source']
+    post_selected_bands = pixel_configs['post_selected_bands']
 
     pre_images_paths = substitute_names(merged_label_paths, pre_platform, 'pre')
     post_images_paths = substitute_names(merged_label_paths, post_platform, 'post')
@@ -231,7 +234,7 @@ def load_dataset_as_table(mode, pixel_configs_path):
     label_concatenated = np.concatenate(label_tabular, 0)
     difference_concatenated = pre_concatenated - post_concatenated
 
-    if configs['use_only_post_image?']:
+    if pixel_configs['use_only_post_image?']:
         return post_concatenated, label_concatenated
     else:
         return difference_concatenated, label_concatenated

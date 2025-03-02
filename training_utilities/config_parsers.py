@@ -76,7 +76,6 @@ def read_learning_configs(configs_path):
         A valid save_every_n_epochs value must be an integer"""
 
 
-
     valid_loss_functions = ["cross_entropy", "focal", "dice", "dice+ce"]
     assert configs['loss_function'] in valid_loss_functions, \
         f"""{font_colors.RED}Error: No valid loss_function is provided.{font_colors.ENDC}
@@ -119,18 +118,22 @@ def read_learning_configs(configs_path):
         f"""{font_colors.RED}Error: wandb_activate? does not have a valid value.{font_colors.ENDC}
         A valid wandb_activate? value must be a boolean"""
 
-    assert Path(configs['dataset_path']).exists(), \
-        f'{font_colors.RED}{font_colors.BOLD}The dataset path ({configs["dataset_path"]}) does not exist!{font_colors.ENDC}'
+    assert Path(configs['dataset_folderpath']).exists(), \
+        f'{font_colors.RED}{font_colors.BOLD}The dataset folderpath ({configs["dataset_folderpath"]}) does not exist!{font_colors.ENDC}'
 
-    assert Path(configs['results_path']).exists(), \
-        f'{font_colors.RED}{font_colors.BOLD}The results path ({configs["results_path"]}) does not exist!{font_colors.ENDC}'
+    assert configs['save_state_folderpath'] is not None, \
+        f"""{font_colors.RED}{font_colors.BOLD} save_state_folderpath must be provided so the model results can be stored somewhere.
+        If it does not exist It will be created automatically"""
 
-    if configs['load_state_path'] is not None:
-        assert Path(configs['load_state_path']).exists(), \
-        f"""{font_colors.RED}{font_colors.BOLD}The checkpoint path ({configs['load_state_path']}) does not exist!{font_colors.ENDC}"""
+    if configs['load_state_filepath'] is not None:
+        assert Path(configs['load_state_filepath']).exists(), \
+        f"""{font_colors.RED}{font_colors.BOLD}The load_state_filepath ({configs['load_state_filepath']}) does not exist!{font_colors.ENDC}"""
 
-    assert (Path(configs['dataset_path'])/configs['split_filename']).exists(), \
-        f"""{font_colors.RED}{font_colors.BOLD}The split_filename ({configs['split_filename']}) does not exist!{font_colors.ENDC}"""
+    assert (Path(configs['event_split_filepath'])).exists(), \
+        f"""{font_colors.RED}{font_colors.BOLD}The event_split_filepath ({configs['event_split_filepath']}) does not exist!{font_colors.ENDC}"""
+
+    assert (Path(configs['specific_hyperparameters_filepath'])).exists(), \
+        f"""{font_colors.RED}{font_colors.BOLD}The specific_hyperparameters_filepath ({configs['specific_hyperparameters_filepath']}) does not exist!{font_colors.ENDC}"""
 
     assert isinstance(configs['patch_width'], int), \
         f"""{font_colors.RED}Error: patch_width does not have a valid value.{font_colors.ENDC}

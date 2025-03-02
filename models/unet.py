@@ -8,82 +8,57 @@ class Double_Convolution(nn.Module):
         super().__init__()
         self.conv_op = nn.Sequential(
             nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1),
+            nn.BatchNorm2d(out_channels),
             nn.ReLU(),
             nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1),
-            nn.ReLU()
-        )
+            nn.BatchNorm2d(out_channels),
+            nn.ReLU())
 
     def forward(self, x):
         return self.conv_op(x)
 
 
-class Encoder(nn.Module):
-    def __init__(self, in_channels, out_channels):
-        super().__init__()
-        self.conv_op = Double_Convolution(in_channels, out_channels)
-        self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
-
-    def forward(self, x):
-        skip_connection = self.conv_op(x)
-        downsampling = self.pool(skip_connection)
-
-        return skip_connection, downsampling
-
-
-class Decoder(nn.Module):
-    def __init__(self, in_channels, out_channels):
-        super().__init__()
-        self.upsample = nn.ConvTranspose2d(in_channels, in_channels // 2, kernel_size=2, stride=2)
-        self.conv_op = Double_Convolution(in_channels, out_channels)
-
-    def forward(self, x, skip_connection):
-        upsampling = self.upsample(x)
-        merged = torch.cat([upsampling, skip_connection], 1)
-
-        return self.conv_op(merged)
-
-
-class Segmentation_Head(nn.Module):
-    def __init__(self, in_channels, out_classes):
-     self.final_convolution = nn.Conv2d(in_channels, out_classes, kernel_size=1)
-
-    def forward(self, x):
-        y = self.final_convolution(x)
-        return y
-
-
-
 class Unet(nn.Module):
-    def __init__(self, input_nbr, label_nbr):
+    def __init__(self, n_channels, n_labels, depth):
+
         super().__init__()
-        self.Down_Block1 = Encoder(2*input_nbr, 64)
-        self.Down_Block2 = Encoder(64, 128)
-        self.Down_Block3 = Encoder(128, 256)
-        self.Down_Block4 = Encoder(256, 512)
+        self.depth = depth
 
-        self.Bottleneck = Double_Convolution(512, 1024)
+        self.encoders = nn.ModuleList(
+            [Double_Convolution(n_channels if d == 0 else 64*2**(d-1), 64*2**d) for d in range(depth)])
+        self.decoders = nn.ModuleList(
+            [Double_Convolution(64*2**(d+1), 64*2**d) for d in reversed(range(depth))])
+        self.down_convs = nn.ModuleList(
+            [nn.MaxPool2d(kernel_size=2) for _ in range(depth)])
+        self.up_convs = nn.ModuleList(
+            [nn.ConvTranspose2d(64*2**(d+1), 64*2**d, kernel_size=2, stride=2) for d in reversed(range(depth))])
 
-        self.Up_Block4 = Decoder(1024, 512)
-        self.Up_Block3 = Decoder(512, 256)
-        self.Up_Block2 = Decoder(256, 128)
-        self.Up_Block1 = Decoder(128, 64)
+        self.bottleneck = Double_Convolution(64*2**(depth-1), 64*2**depth)
+        self.segmentation_head = nn.Conv2d(64, n_labels, kernel_size=1)
 
-        self.Segmentation_Head = nn.Conv2d(64, label_nbr, kernel_size=1)
 
     def forward(self, pre_image, post_image):
-        concatenated_image = torch.cat((pre_image, post_image), 1)
-        skip1, down1 = self.Down_Block1(concatenated_image)
-        skip2, down2 = self.Down_Block2(down1)
-        skip3, down3 = self.Down_Block3(down2)
-        skip4, down4 = self.Down_Block4(down3)
 
-        b = self.Bottleneck(down4)
+        x = torch.cat((pre_image, post_image), dim=1)
+        skip_connections = []
 
-        up4 = self.Up_Block4(b, skip4)
-        up3 = self.Up_Block3(up4, skip3)
-        up2 = self.Up_Block2(up3, skip2)
-        up1 = self.Up_Block1(up2, skip1)
+        for (encoder, down_conv) in zip(self.encoders, self.down_convs):
+            x = encoder(x)
+            skip_connections.append(x)
+            x = down_conv(x)
 
-        logits = self.Segmentation_Head(up1)
+        x = self.bottleneck(x)
 
-        return logits
+        for (skip, up_conv, decoder) in zip(reversed(skip_connections), self.up_convs, self.decoders):
+            x = up_conv(x)
+            x = torch.cat((skip, x), dim=1)
+            x = decoder(x)
+
+        logit_segmentation = self.segmentation_head(x)
+
+        return logit_segmentation
+
+#pre = torch.rand(2,4,128,128)
+#post= torch.rand(2,4,128,128)
+#model = Unet(8,2,1)
+#res = model(pre, post)
