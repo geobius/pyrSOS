@@ -26,14 +26,15 @@ test4_label = common_folder / 'domokos_lma_post_250cm_label.tif'
 
 
 def histogram_burnt(common_folder, area):
-    lma_path = next(common_folder.glob(f'{area}*lma*multiband.tif'))
-    mask_path = next(common_folder.glob(f'{area}*lma*label.tif'))
+    search_folder = common_folder/ area
+
+    lma_path = next(search_folder.glob(f'{area}*lma*multiband.tif'))
+    mask_path = next(search_folder.glob(f'{area}*lma*label.tif'))
 
     with rio.open(lma_path) as multiband_ds:
         area_image = multiband_ds.read()
     with rio.open(mask_path) as mask_ds:
         area_mask = mask_ds.read(1)
-
     burnt_subset = area_image[:, area_mask == 1]
 
     fig, axes = plt.subplots(1, 4, figsize=(20, 5))
@@ -50,6 +51,52 @@ def histogram_burnt(common_folder, area):
     plt.show()
 
     return
+
+def histogram_all_classes(common_folder, area):
+    search_folder = common_folder/ area
+
+    lma_path = next(search_folder.glob(f'{area}*lma*multiband.tif'))
+    mask_path = next(search_folder.glob(f'{area}*lma*label.tif'))
+
+    with rio.open(lma_path) as multiband_ds:
+        area_image = multiband_ds.read()
+    with rio.open(mask_path) as mask_ds:
+        area_mask = mask_ds.read(1)
+    burnt_subset = area_image[:, area_mask == 1]
+    unburnt_subset = area_image[:, area_mask == 0]
+
+
+    fig, axes = plt.subplots(1, 4, figsize=(20, 5))
+    xlabels = ['green', 'red', 'red edge', 'near infared']
+    fig.suptitle(f"{area} All classes")
+
+    for i in range(4):
+        burnt_hist, bins = np.histogram(burnt_subset[i, :], bins=256, density=True)
+        unburnt_hist, _ = np.histogram(unburnt_subset[i, :], bins=256, density=True)
+
+        overlap = np.minimum(burnt_hist, unburnt_hist)
+        burnt_remaining = burnt_hist - overlap
+        unburnt_remaining = unburnt_hist - overlap
+
+        axes[i].bar(bins[:-1], overlap, width=1, color='yellow', label='overlap area')
+        axes[i].bar(bins[:-1], burnt_remaining, width=1, bottom=overlap, color='red', label='burnt only')
+        axes[i].bar(bins[1:-1], unburnt_remaining[1:], width=1, bottom=overlap[1:,], color='blue', label='unburnt only')
+
+        axes[i].set_xlabel(xlabels[i])
+        axes[i].set_ylabel("density")
+
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
+
+    return
+
+
+
+
+
+
+
 
 
 def histogram_burnt_all_areas(common_folder):
@@ -82,6 +129,45 @@ def histogram_burnt_all_areas(common_folder):
     plt.show()
 
     return
+
+
+def scatterplot_burnt(common_folder, area):
+    search_folder = common_folder/ area
+
+    lma_path = next(search_folder.glob(f'{area}*lma*multiband.tif'))
+    mask_path = next(search_folder.glob(f'{area}*lma*label.tif'))
+
+    with rio.open(lma_path) as multiband_ds:
+        area_image = multiband_ds.read()
+    with rio.open(mask_path) as mask_ds:
+        area_mask = mask_ds.read(1)
+
+    burnt_subset = area_image[:, area_mask == 1].T
+
+
+    fig, axes = plt.subplots(2, 3)
+    axes = axes.ravel()
+    labels = ['Green', 'Red', 'Red Edge', 'Near Infared']
+    fig.suptitle(f"{area} Scatterplots between channels for burnt pixels")
+
+    np.random.seed(103)
+    number_of_rows_to_select = 10000
+    random_row_indices = np.random.choice(burnt_subset.shape[0], number_of_rows_to_select, replace=False)
+    column_combinations = list(combinations(range(4), 2))
+
+    for i, (x, y) in enumerate(column_combinations):
+        axes[i].scatter(burnt_subset[[random_row_indices], x], burnt_subset[[random_row_indices], y], alpha=0.7, color='red')
+        axes[i].set_xlabel(labels[x])
+        axes[i].set_ylabel(labels[y])
+
+    plt.tight_layout()
+    plt.show()
+
+    return
+
+
+
+
 
 def scatterplot_burnt_all_areas(common_folder):
     burnt_subsets = []

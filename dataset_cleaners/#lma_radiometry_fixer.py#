@@ -75,7 +75,7 @@ def floodfill_algorithm(bands, initial_row, initial_column):
             is_pixel_within_bounds = 0 <= new_row < image_height and 0 <= new_column < image_width
 
             if is_pixel_within_bounds and white_mask[new_row, new_column]:
-                bands[:, new_row, new_column] = BLACK
+3                bands[:, new_row, new_column] = BLACK
                 white_mask[new_row, new_column] = False
                 queue.append((new_row, new_column))
 

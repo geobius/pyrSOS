@@ -66,15 +66,9 @@ def read_learning_configs(configs_path):
         f"""{font_colors.RED}Error: #epochs does not have a valid value.{font_colors.ENDC}
         A valid #epoch value must be an integer"""
 
-    assert isinstance(configs['#training_repetitions'], int), \
-        f"""{font_colors.RED}Error: #training_repetitions does not have a valid value.{font_colors.ENDC}
-        A valid #training_repetitions value must be an integer"""
-
-
     assert isinstance(configs['save_every_n_epochs'], int), \
         f"""{font_colors.RED}Error: save_every_n_epochs does not have a valid value.{font_colors.ENDC}
         A valid save_every_n_epochs value must be an integer"""
-
 
     valid_loss_functions = ["cross_entropy", "focal", "dice", "dice+ce"]
     assert configs['loss_function'] in valid_loss_functions, \
@@ -93,7 +87,7 @@ def read_learning_configs(configs_path):
         f"""{font_colors.RED}Error: use_only_burned_patches? does not have a valid value.{font_colors.ENDC}
         A valid use_only_burned_patches? value must be a boolean"""
 
-    valid_visualization_sets = ['training set', 'validation set', 'testing set']
+    valid_visualization_sets = ['training_set', 'validation_set', 'testing_set']
     assert configs['visualization_set'] in valid_visualization_sets, \
         f"""{font_colors.RED}Error: No valid visualization_set is provided.{font_colors.ENDC}
         A valid visualization_set must be one of the following {font_colors.BLUE}{valid_visualization_sets}{font_colors.BLUE}"""
@@ -121,6 +115,9 @@ def read_learning_configs(configs_path):
     assert Path(configs['dataset_folderpath']).exists(), \
         f'{font_colors.RED}{font_colors.BOLD}The dataset folderpath ({configs["dataset_folderpath"]}) does not exist!{font_colors.ENDC}'
 
+    assert Path(configs['patches_folderpath']).exists(), \
+        f'{font_colors.RED}{font_colors.BOLD}The patches folderpath ({configs["patches_folderpath"]}) does not exist!{font_colors.ENDC}'
+
     assert configs['save_state_folderpath'] is not None, \
         f"""{font_colors.RED}{font_colors.BOLD} save_state_folderpath must be provided so the model results can be stored somewhere.
         If it does not exist It will be created automatically"""
@@ -129,8 +126,11 @@ def read_learning_configs(configs_path):
         assert Path(configs['load_state_filepath']).exists(), \
         f"""{font_colors.RED}{font_colors.BOLD}The load_state_filepath ({configs['load_state_filepath']}) does not exist!{font_colors.ENDC}"""
 
-    assert (Path(configs['event_split_filepath'])).exists(), \
+    assert (Path(configs['split_filepath'])).exists(), \
         f"""{font_colors.RED}{font_colors.BOLD}The event_split_filepath ({configs['event_split_filepath']}) does not exist!{font_colors.ENDC}"""
+
+    assert (Path(configs['stats_filepath'])).exists(), \
+        f"""{font_colors.RED}{font_colors.BOLD}The stats_filepath ({configs['stats_filepath']}) does not exist!{font_colors.ENDC}"""
 
     assert (Path(configs['specific_hyperparameters_filepath'])).exists(), \
         f"""{font_colors.RED}{font_colors.BOLD}The specific_hyperparameters_filepath ({configs['specific_hyperparameters_filepath']}) does not exist!{font_colors.ENDC}"""
@@ -148,9 +148,10 @@ def read_learning_configs(configs_path):
         f"""{font_colors.RED}Error: No valid pre data source is provided.{font_colors.ENDC}
         A valid pre data source must be one of the following {font_colors.BLUE}{valid_pre_data_sources}{font_colors.BLUE}"""
 
-    assert isinstance(configs['pre_normalize?'], bool), \
-        f"""{font_colors.RED}Error: pre_normalize? does not have a valid value.{font_colors.ENDC}
-        A valid pre_normalize? value must be a boolean"""
+    valid_pre_scale_input_methods = ['standardization', 'reflectance', 'minmax', None]
+    assert configs['pre_scale_input_method'] in valid_pre_scale_input_methods, \
+        f"""{font_colors.RED}Error: No valid pre_scale_input_method is provided.{font_colors.ENDC}
+        A valid pre_scale_input_method must be one of the following {font_colors.BLUE}{valid_pre_scale_input_methods}{font_colors.BLUE}"""
 
     assert isinstance(configs['pre_gsd'], str), \
         f"""{font_colors.RED}Error: pre_gsd_meters does not have a valid value.{font_colors.ENDC}
@@ -167,9 +168,10 @@ def read_learning_configs(configs_path):
         f"""{font_colors.RED}Error: No valid post_data_source is provided.{font_colors.ENDC}
         A valid post_data_source must be one of the following {font_colors.BLUE}{valid_models}{font_colors.BLUE}"""
 
-    assert isinstance(configs['post_normalize?'], bool), \
-        f"""{font_colors.RED}Error: post_normalize? does not have a valid value.{font_colors.ENDC}
-        A valid post_normalize? value must be a boolean"""
+    valid_post_scale_input_methods = ['standardization', 'reflectance', 'minmax', None]
+    assert configs['post_scale_input_method'] in valid_post_scale_input_methods, \
+        f"""{font_colors.RED}Error: No valid post_scale_input_method is provided.{font_colors.ENDC}
+        A valid post_scale_input_method must be one of the following {font_colors.BLUE}{valid_post_scale_input_methods}{font_colors.BLUE}"""
 
     assert isinstance(configs['post_gsd'], str), \
         f"""{font_colors.RED}Error: post_gsd_meters does not have a valid value.{font_colors.ENDC}

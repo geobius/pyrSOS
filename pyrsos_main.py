@@ -54,8 +54,8 @@ parser.add_argument('--configs_filepath', type=Path, default='configs/convolutio
 args = parser.parse_args()
 
 general_configs_filepath = args.configs_filepath
-#configs = read_learning_configs(general_configs_path) this does checks
-configs = pyjson5.load(open(general_configs_filepath)) #this is a quickie
+configs = read_learning_configs(general_configs_filepath) #this does checks
+#configs = pyjson5.load(open(general_configs_filepath)) #this does not check
 
 model_configs_path = Path(configs['specific_hyperparameters_filepath'])#that way I can have multiple files of hyperparameters
 model_configs = pyjson5.load(open(model_configs_path, 'r'))
@@ -72,20 +72,20 @@ class_weights = compute_class_weights(configs)
 save_every = configs['save_every_n_epochs']
 last_epoch = starting_epoch + configs['#epochs']
 
-train_dataset = Pyrsos_Dataset('training set', configs)
-val_dataset = Pyrsos_Dataset('validation set', configs)
-test_dataset = Pyrsos_Dataset('testing set', configs)
+train_dataset = Pyrsos_Dataset('training_set', configs)
+val_dataset = Pyrsos_Dataset('validation_set', configs)
+test_dataset = Pyrsos_Dataset('testing_set', configs)
 
 
 if configs['learning_stage'] == 'train':
     train_loader = init_train_loader(train_dataset, configs)
     val_loader = DataLoader(val_dataset, num_workers=configs['#workers'], batch_size=configs['batch_size'], shuffle=True, pin_memory=True)
 
-    print(f'{font_colors.CYAN}Using {configs["loss_function"]} with class weights: {class_weights["training set"]}.{font_colors.ENDC}')
+    print(f'{font_colors.CYAN}Using {configs["loss_function"]} with class weights: {class_weights["training_set"]}.{font_colors.ENDC}')
 
     model = init_model(model_name, model_configs, state_dictionaries, patch_width, number_of_channels).to(device=configs['device'])
-    train_criterion = init_loss(loss_function_name, class_weights['training set'], model_configs).to(device=configs['device'])
-    val_criterion = init_loss(loss_function_name, class_weights['validation set'], model_configs).to(device=configs['device'])
+    train_criterion = init_loss(loss_function_name, class_weights['training_set'], model_configs).to(device=configs['device'])
+    val_criterion = init_loss(loss_function_name, class_weights['validation_set'], model_configs).to(device=configs['device'])
     optimizer = init_optimizer(model, state_dictionaries, configs, model_configs)
     lr_scheduler = init_lr_scheduler(optimizer, state_dictionaries, configs, model_configs)
     wandb = init_wandb(configs, model_configs)
@@ -97,13 +97,10 @@ if configs['learning_stage'] == 'train':
     for epoch in range(starting_epoch, last_epoch):
         print(f'=== Epoch: {epoch} ===')
         print('---BackPropagation---')
-        model = train1epoch(model, train_loader, train_criterion, optimizer, lr_scheduler, configs['device']) #update the weights
+        train_loss, train_metrics = train1epoch(model, train_loader, train_criterion, optimizer, lr_scheduler, configs['device']) #update the weights
         learning_rate = (lr_scheduler.get_last_lr())[0]
-
-        print('---observing the mean training curve curve at the end of the epoch---')
-        train_loss, train_metrics = eval1epoch(model, train_loader, train_criterion, configs['device'])  #metrics for underfitting checks.
-        print(f'Mean Train Loss: {train_loss:.6f}')
-        wandb_log_metrics(train_loss, train_metrics, learning_rate, epoch, 'train', configs['wandb_activate?'])
+        print(f'training Loss: {train_loss:.6f}')
+        wandb_log_metrics(train_loss, train_metrics, learning_rate, epoch, 'training', configs['wandb_activate?'])
 
         print('---Validating for Overfitting---')
         val_loss, val_metrics = eval1epoch(model, val_loader, val_criterion, configs['device'])  #metrics for overfitting checks.
@@ -117,16 +114,9 @@ if configs['learning_stage'] == 'train':
             best_model = model
             best_epoch = epoch
 
-            previous_best_file = list(save_folder.glob('best_epoch*.pt'))
-            for file in previous_best_file:
-                file.unlink()
+        if (save_every > 0 and epoch % save_every == 0) or (epoch == last_epoch - 1):
             new_checkpoint_path = save_folder / f'best_epoch={best_epoch}.pt'
             save_checkpoint(new_checkpoint_path, val_loss, best_model, optimizer, lr_scheduler)
-
-
-        if (save_every > 0 and epoch % save_every == 0) or (epoch == last_epoch - 1):
-            new_checkpoint_path = save_folder / f'checkpoint_epoch={epoch}.pt'
-            save_checkpoint(new_checkpoint_path, val_loss, model, optimizer, lr_scheduler)
 
 
 
@@ -138,16 +128,16 @@ if configs['learning_stage'] == 'eval':
     val_loader = DataLoader(val_dataset, num_workers=configs['#workers'], batch_size=configs['batch_size'], shuffle=True, pin_memory=True)
     test_loader = DataLoader(test_dataset, num_workers=configs['#workers'], batch_size=configs['batch_size'], shuffle=True, pin_memory=True)
 
-    train_criterion = init_loss(loss_function_name, class_weights['training set'], model_configs).to(device=configs['device'])
-    val_criterion = init_loss(loss_function_name, class_weights['validation set'], model_configs).to(device=configs['device'])
-    test_criterion = init_loss(loss_function_name, class_weights['testing set'], model_configs).to(device=configs['device'])
+    train_criterion = init_loss(loss_function_name, class_weights['training_set'], model_configs).to(device=configs['device'])
+    val_criterion = init_loss(loss_function_name, class_weights['validation_set'], model_configs).to(device=configs['device'])
+    test_criterion = init_loss(loss_function_name, class_weights['testing_set'], model_configs).to(device=configs['device'])
     model = init_model(model_name, model_configs, state_dictionaries, patch_width, number_of_channels).to(device=configs['device'])
 
-    training_loss, training_metrics = eval1epoch(model, train_loader, train_criterion, configs['device'])  #metrics for overfitting checks.
-    validation_loss, validation_metrics = eval1epoch(model, val_loader, val_criterion, configs['device'])  #metrics for overfitting checks.
-    test_loss, test_metrics = eval1epoch(model, test_loader, test_criterion, configs['device'])  #metrics for overfitting checks.
+    #training_loss, training_metrics = eval1epoch(model, train_loader, train_criterion, configs['device'])  #metrics for overfitting checks.
+    #validation_loss, validation_metrics = eval1epoch(model, val_loader, val_criterion, configs['device'])  #metrics for overfitting checks.
+    #test_loss, test_metrics = eval1epoch(model, test_loader, test_criterion, configs['device'])  #metrics for overfitting checks.
 
-    print(f'Mean Training Loss: {training_loss:.6f} metrics: {training_metrics}')
-    print(f'Mean Validation Loss: {validation_loss:.6f} metrics: {validation_metrics}')
-    print(f'Mean Testing Loss: {test_loss:.6f} metrics: {test_metrics}')
-    vis = convolutional_visualizer(configs, model)
+    #print(f'Mean Training Loss: {training_loss:.6f} metrics: {training_metrics}')
+    #print(f'Mean Validation Loss: {validation_loss:.6f} metrics: {validation_metrics}')
+    #print(f'Mean Testing Loss: {test_loss:.6f} metrics: {test_metrics}')
+    vis = convolutional_visualizer(model, configs)

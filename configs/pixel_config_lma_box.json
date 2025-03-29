@@ -1,0 +1,48 @@
+{
+    "model": "bam_cd",
+    "learning_stage": "eval",//train or eval
+    "#workers": 6,
+    "seed": 999,
+    "device": "cuda",
+    "batch_size": 15,
+
+    "#epochs": 2,
+    "save_every_n_epochs": 25,
+    "loss_function": "cross_entropy",
+    "weighted_loss?": false,
+    "augment?": false,
+    "use_only_burned_patches?": false,
+    "visualization_set": "testing_set",
+
+    "wandb_project": "pretraining",
+    "wandb_entity": "",
+    "wandb_id": "",
+    "wandb_resume?": false,
+    "wandb_activate?":false,
+
+    "dataset_folderpath": "/mnt/7EBA48EEBA48A48D/examhno10/ptyhiakh/pyrsos/pyrsos_250cm_dataset",
+    "patches_folderpath": "/mnt/7EBA48EEBA48A48D/examhno10/ptyhiakh/pyrsos/patches128", //only for visualization purposes
+    "save_state_folderpath": "/mnt/7EBA48EEBA48A48D/examhno10/ptyhiakh/pyrsos/results",
+    "load_state_filepath": "/mnt/7EBA48EEBA48A48D/examhno10/ptyhiakh/pyrsos/results/bam_cd/resnet34/best_epoch=122.pt",
+    "split_filepath": "/mnt/7EBA48EEBA48A48D/examhno10/ptyhiakh/pyrsos/patches128/event_splits_v1.json",
+    "stats_filepath": "/mnt/7EBA48EEBA48A48D/examhno10/ptyhiakh/pyrsos/patches128/stats_logger.json",
+    "specific_hyperparameters_filepath": "/mnt/7EBA48EEBA48A48D/examhno10/ptyhiakh/pyrsos/python_scripts/configs/method/bam_cd.json",
+    
+    "patch_width": 128,
+    "patch_height": 128,
+    "fusion_method": "only_post_image", //available options are only_post_image, difference, concatenation. This config is valid only for pixel based methods and is ignored for convolutional models
+
+    "pre_data_source": "sen2", //only option
+    "pre_scale_input_method": null,  //available options are standardization, reflectance, minmax, None
+    "pre_gsd": "250cm",
+    "pre_selected_bands": [3,4,7], //1 based indexing
+
+    "post_data_source": "lma", //lma or sen2
+    "post_scale_input_method": null,  //available options are standardization, reflectance, minmax, None
+    "post_gsd": "250cm",
+    "post_selected_bands": [1,2,4] //1-based indexing
+}
+
+//patches_folderpath is distinct from dataset_folderpath because it was faster for the pixel methods to load the entire image at once during training
+
+

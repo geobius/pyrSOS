@@ -40,10 +40,10 @@ if __name__ == '__main__':
     all_events = [folder.stem for folder in args.dataset_folder.iterdir() if folder.is_dir()]
     for event in all_events:
         source_folder = args.dataset_folder/event
-        event_files = source_folder.glob('*.tif')
+        event_files = source_folder.glob('*multiband.tif')
         for current_file in event_files:
             with rio.open(current_file) as ds:
-                image_name = ds.name
+                image_name = current_file.stem
                 bands = ds.read()
                 stats = extract_stats(bands)
                 new_entry = {image_name: stats}

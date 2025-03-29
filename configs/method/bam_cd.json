@@ -7,7 +7,7 @@
         "lr_schedule": null
     },
     "architecture": "UNet",
-    "backbone": "resnet18",
+    "backbone": "resnet34",
     "pretrained": false,
     "encoder_weights": null,
     "activation": null,  // Options: "softmax", "logsoftmax", null

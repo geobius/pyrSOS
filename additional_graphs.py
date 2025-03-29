@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 import numpy as np
 from matplotlib import pyplot as plt
+from matplotlib.patches import Rectangle
 from sklearn.linear_model import LogisticRegression
 from sklearn.svm import SVC
 
@@ -8,31 +9,6 @@ from torchviz import make_dot
 import torch
 import pyjson5
 from pathlib import Path
-
-from training_utilities.config_parsers import (
-    read_learning_configs,
-    font_colors)
-
-
-from training_utilities.initializers import (
-    init_optimizer,
-    save_checkpoint,
-    init_lr_scheduler,
-    reset_or_continue,
-    init_model,
-    compute_class_weights,
-    init_loss,
-    init_wandb,
-)
-from training_utilities.dataloaders import Pyrsos_Dataset, Burned_Area_Sampler
-from training_utilities.learning_loops import (
-    train1epoch,
-    eval1epoch,
-    wandb_log_metrics
-)
-
-from training_utilities.prediction_visualization import convolutional_classifier_visualizer
-
 
 
 
@@ -101,6 +77,38 @@ def plot_svm():
     plt.show()
 
     return
+
+
+
+def plot_rectangle():
+    feature1 = np.random.normal(loc=120, scale=5, size=100)
+    feature2 = np.random.normal(loc=80, scale=2, size=100)
+    fake_data = np.stack((feature1, feature2), axis=1)
+    plt.scatter(feature1, feature2, color='blue', label='class1')
+
+
+    down_right = (120 - 5, 80 - 2)
+    height = 2*2
+    width = 2*5
+
+    rect = Rectangle(xy=down_right,
+                     height=height,
+                     width=width,
+                     edgecolor='red',
+                     fill=False,
+                     facecolor=None)
+
+    plt.gca().add_patch(rect)
+
+    plt.title("Binary Rectangle Classifier")
+    plt.xlabel("Feature 1")
+    plt.ylabel("Feature 2")
+    plt.show()
+
+    return
+
+
+
 
 """
 def plot_torchmodel(config_folder):

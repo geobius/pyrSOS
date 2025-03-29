@@ -22,24 +22,6 @@ from .initializers import (
 CLASS_LABELS = {0: 'Unburnt', 1: 'Burnt'}
 
 
-def train1epoch(model, train_dataloader, loss_function, optimizer, scheduler, device):
-    model.train()
-
-    for (pre_images, post_images, labels, _) in tqdm(train_dataloader):
-        pre_images = pre_images.to(device=device, dtype=torch.float32)
-        post_images = post_images.to(device=device, dtype=torch.float32)
-        labels = labels.to(device=device)
-
-        optimizer.zero_grad()
-        predictions = model(pre_images, post_images)
-        batch_loss = loss_function(predictions, labels)
-        batch_loss.backward()
-        optimizer.step()
-
-    scheduler.step()
-
-    return model
-
 def make_metrics_table():
 
     pyrsos_metrics = MetricCollection({
@@ -52,6 +34,37 @@ def make_metrics_table():
     return pyrsos_metrics
 
 
+def train1epoch(model, train_dataloader, loss_function, optimizer, scheduler, device):
+    model.train()
+
+    total_batches = len(train_dataloader)
+    running_loss = 0.0
+    metrics = make_metrics_table().to(device=device)
+
+    for (pre_images, post_images, labels) in tqdm(train_dataloader):
+        pre_images = pre_images.to(device=device, dtype=torch.float32)
+        post_images = post_images.to(device=device, dtype=torch.float32)
+        labels = labels.to(device=device)
+
+        optimizer.zero_grad()
+        logit_outputs = model(pre_images, post_images)
+        batch_loss = loss_function(logit_outputs, labels)
+        running_loss += batch_loss.item()
+        batch_loss.backward()
+        optimizer.step()
+
+        probabilities = torch.softmax(logit_outputs, dim=1)
+        masks = torch.argmax(probabilities, dim=1)
+        metrics.update(masks, labels)
+
+    total_loss = running_loss / total_batches
+    final_metrics = metrics.compute()
+
+    scheduler.step()
+
+    return total_loss, final_metrics
+
+
 def eval1epoch(model, dataloader, loss_function, device):
     model.eval()
 
@@ -59,7 +72,7 @@ def eval1epoch(model, dataloader, loss_function, device):
     running_loss = 0.0
     metrics = make_metrics_table().to(device=device)
     with torch.no_grad():
-        for (pre_images, post_images, labels, _) in tqdm(dataloader):
+        for (pre_images, post_images, labels) in tqdm(dataloader):
             pre_images = pre_images.to(device=device, dtype=torch.float32)
             post_images = post_images.to(device=device, dtype=torch.float32)
             labels = labels.to(device=device)

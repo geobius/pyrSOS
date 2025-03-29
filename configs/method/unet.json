@@ -1,6 +1,6 @@
 {
     "method": "unet",
-    "depth" : 2,
+    "depth" : 3,
     "optimizer": {
         "name": "adamw",
         "learning_rate": 1e-5,

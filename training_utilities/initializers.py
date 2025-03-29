@@ -146,19 +146,22 @@ def compute_class_weights(configs):
         patch_width = configs['patch_width']
         patch_height = configs['patch_height']
 
-        burnt = {'training set': 0, 'validation set': 0, 'testing set': 0}
-        unburnt = {'training set': 0, 'validation set': 0, 'testing set': 0}
+        burnt = {'training_set': 0, 'validation_set': 0, 'testing_set': 0}
+        unburnt = {'training_set': 0, 'validation_set': 0, 'testing_set': 0}
 
-        for mode in ['training set', 'validation set', 'testing set']:
+        for mode in ['training_set', 'validation_set', 'testing_set']:
             ds_path = Path(configs['dataset_folderpath'])
-            splits = pyjson5.load(open(configs['event_split_filepath'], 'r'))
+            splits = pyjson5.load(open(configs['split_filepath'], 'r'))
             areas_in_the_set = splits[mode]
-            label_paths_per_area = [list((ds_path/area).glob('*label_*.tif')) for area in areas_in_the_set]
-            merged_label_paths = [item for sublist in label_paths_per_area for item in sublist]
 
-            for patch in merged_label_paths:
-                if 'positive' in patch.stem:
-                    with rio.open(patch) as label:
+            label_paths = []
+            for area in areas_in_the_set:
+                area_folder = ds_path/area
+                label_paths.extend(list(area_folder.glob('*label*')))
+
+            for patch_path in label_paths:
+                if 'positive' in patch_path.stem:
+                    with rio.open(patch_path) as label:
                         mask_band = label.read(1).flatten()
                         patch_unburnt = sum(mask_band == 0) #count zeros
                         patch_burnt = patch_width * patch_height - patch_unburnt #the remaining pixels
@@ -170,18 +173,18 @@ def compute_class_weights(configs):
                     unburnt[mode] += (patch_width * patch_height)
 
         return {
-            'training set': ((burnt['training set'] + unburnt['training set']) / (2 * unburnt['training set']),
-                      (burnt['training set'] + unburnt['training set']) / (2 * burnt['training set'])),
-            'validation set': ((burnt['validation set'] + unburnt['validation set']) / (2 * unburnt['validation set']),
-                    (burnt['validation set'] + unburnt['validation set']) / (2 * burnt['validation set'])),
-            'testing set': ((burnt['testing set'] + unburnt['testing set']) / (2 * unburnt['testing set']),
-                     (burnt['testing set'] + unburnt['testing set']) / (2 * burnt['testing set']))
+            'training_set': ((burnt['training_set'] + unburnt['training_set']) / (2 * unburnt['training_set']),
+                      (burnt['training_set'] + unburnt['training_set']) / (2 * burnt['training_set'])),
+            'validation_set': ((burnt['validation_set'] + unburnt['validation_set']) / (2 * unburnt['validation_set']),
+                    (burnt['validation_set'] + unburnt['validation_set']) / (2 * burnt['validation_set'])),
+            'testing_set': ((burnt['testing_set'] + unburnt['testing_set']) / (2 * unburnt['testing_set']),
+                     (burnt['testing_set'] + unburnt['testing_set']) / (2 * burnt['testing_set']))
         }
     else:
         return {
-            'training set': (1, 1),
-            'validation set': (1, 1),
-            'testing set': (1, 1)
+            'training_set': (1, 1),
+            'validation_set': (1, 1),
+            'testing_set': (1, 1)
         }
 
 
