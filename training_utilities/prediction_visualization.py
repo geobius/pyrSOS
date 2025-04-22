@@ -37,8 +37,8 @@ class visualizer():
 
         self.fig, self.axes = plt.subplots(1, 4, figsize=(20, 5))
         self.fig.canvas.mpl_connect('key_press_event', self.on_key)
-        self.display()
-        plt.show()
+        #self.display()
+        #plt.show()
 
     def load_patches(self): #those patches are just for show
         pre_path = self.pre_patches_paths[self.index]
@@ -112,19 +112,27 @@ class visualizer():
 
         plt.tight_layout(pad=0.0)
 
-        self.fig.canvas.draw_idle()
-
-
+    def next(self):
+        self.index = (self.index + 1) % self.dataset_size
+    def previous(self):
+        self.index = (self.index - 1) % self.dataset_size
+        
     def on_key(self, event):
         match(event.key):
             case 'right':
-                self.index = (self.index + 1) % self.dataset_size
+                self.next()
             case 'left':
-                self.index = (self.index - 1) % self.dataset_size
-
-
+                self.previous()
         self.display()
+        #plt.show()
+        self.fig.canvas.draw_idle()
 
+    def on_print(self, k):
+        base_out_path = Path(self.configs['save_state_folderpath'])
+        for i in range(k):
+            self.display()
+            plt.savefig(base_out_path/f'{i}.png')
+            self.next()
 
         
 class pixel_visualizer(visualizer):

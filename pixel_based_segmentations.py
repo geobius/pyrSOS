@@ -49,7 +49,7 @@ def make_balanced_subset(x, y, size, seed):
     return subset_x_balanced, subset_y_balanced
 
 
-pixel_configs = pyjson5.load(open(Path('/mnt/7EBA48EEBA48A48D/examhno10/ptyhiakh/pyrsos/python_scripts/configs/pixel_config_lma.json')))
+pixel_configs = pyjson5.load(open(Path('/mnt/7EBA48EEBA48A48D/examhno10/ptyhiakh/pyrsos/python_scripts/configs/pixel_config_sen2.json')))
 
 x_train, y_train = load_dataset_as_table('training_set', pixel_configs)
 x_val, y_val = load_dataset_as_table('validation_set', pixel_configs)
@@ -67,7 +67,7 @@ tree_hyperparameters = {
     'ccp_alpha': 0.0,
     'class_weight': None,
     'criterion': 'gini',
-    'max_depth': 16,
+    'max_depth': 15,
     'max_features': None,
     'max_leaf_nodes': None,
     'min_impurity_decrease': 0.0,
@@ -80,10 +80,10 @@ tree_hyperparameters = {
 
 
 forest_hyperparameters = {
-    'n_estimators': 101,
+    'n_estimators': 51,
     'class_weight': None,
     'criterion': 'gini',
-    'max_depth': 16,
+    'max_depth': 15,
     'random_state': 5385}
 
 
@@ -95,13 +95,13 @@ xgboost_hyperparameters = {
     'base_score': 0.5,
     'tree_method': 'hist',
     'verbose': 1,
-    'n_estimators': 50,
-    'max_depth': 16,
+    'n_estimators': 5,
+    'max_depth': 15,
     'learning_rate': 0.3,
     'scale_pos_weight': 1
 }
 
-kappa = 2
+kappa = 2.0
 
 
 class BinaryRectangleClassifier():
@@ -197,10 +197,9 @@ def run(model_name):
 #trained_model = run('svm')
 #trained_model = run('tree')
 #trained_model = run('forest')
-trained_model = run('xgb')
-#trained_model = run('allburnt')
+#trained_model = run('xgb')
+trained_model = run('allburnt')
 #trained_model = run('rectangle')
 
-vis = pixel_visualizer(trained_model, pixel_configs)
-
-#check = np.zeros((1, 4))
+#vis = pixel_visualizer(trained_model, pixel_configs)
+#vis.on_print(1500)

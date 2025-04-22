@@ -19,10 +19,13 @@ class Double_Convolution(nn.Module):
 
 
 class Unet(nn.Module):
-    def __init__(self, n_channels, n_labels, depth):
-
+    def __init__(self, n_channels, n_labels, depth, fusion_method):
         super().__init__()
         self.depth = depth
+        self.fusion_method = fusion_method
+
+        if fusion_method == 'concatenation':
+            n_channels = 2*n_channels
 
         self.encoders = nn.ModuleList(
             [Double_Convolution(n_channels if d == 0 else 64*2**(d-1), 64*2**d) for d in range(depth)])
@@ -39,7 +42,15 @@ class Unet(nn.Module):
 
     def forward(self, pre_image, post_image):
 
-        x = torch.cat((pre_image, post_image), dim=1)
+        x = []
+        match(self.fusion_method):
+            case 'concatenation':
+                x = torch.cat((pre_image, post_image), dim=1)
+            case 'difference':
+                x = pre_image - post_image
+            case 'only_post_image':
+                x = post_image
+
         skip_connections = []
 
         for (encoder, down_conv) in zip(self.encoders, self.down_convs):
@@ -60,5 +71,5 @@ class Unet(nn.Module):
 
 #pre = torch.rand(2,4,128,128)
 #post= torch.rand(2,4,128,128)
-#model = Unet(8,2,1)
+#model = Unet(4,2,1,'only_post_image')
 #res = model(pre, post)

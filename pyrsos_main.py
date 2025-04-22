@@ -18,7 +18,6 @@ from pathlib import Path
 import torch
 from torch.utils.data import DataLoader
 
-
 from training_utilities.config_parsers import (
     read_learning_configs,
     font_colors)
@@ -141,3 +140,7 @@ if configs['learning_stage'] == 'eval':
     #print(f'Mean Validation Loss: {validation_loss:.6f} metrics: {validation_metrics}')
     #print(f'Mean Testing Loss: {test_loss:.6f} metrics: {test_metrics}')
     vis = convolutional_visualizer(model, configs)
+
+    #I am too bored to manually press right and left buttons so I send the event
+    #programmaticaly
+    vis.on_print(2500)
