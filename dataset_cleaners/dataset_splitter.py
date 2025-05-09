@@ -23,11 +23,11 @@ def split_dataset(base_out_path, optional_prefix, seed):
     training_events = [e for e in main_events if e not in validation_events]
 
     all_splits = {
-        'training set': training_events,
-        'validation set': validation_events,
-        'testing set': test_events
+        'training_set': training_events,
+        'validation_set': validation_events,
+        'testing_set': test_events
     }
-   
+    
     json_split_name = f'event_splits_{optional_prefix}.json'
     pyjson5.dump(all_splits, open(base_out_path/json_split_name, 'wb'))
 
@@ -39,7 +39,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=
     """This program generates a json5 file denoting which areas will be used for training, validation and testing.""")
 
-    parser.add_argument('--base_out_path', type=Path, default='/mnt/7EBA48EEBA48A48D/examhno10/ptyhiakh/pyrsos/destination')
+    parser.add_argument('base_out_path', type=Path, default='/mnt/7EBA48EEBA48A48D/examhno10/ptyhiakh/pyrsos/destination')
     parser.add_argument('--prefix', type=str, default='v1')
     parser.add_argument('--seed', type=int, default=29)
     args = parser.parse_args()

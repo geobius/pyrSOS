@@ -46,7 +46,7 @@ from training_utilities.prediction_visualization import convolutional_visualizer
 
 parser = argparse.ArgumentParser()
 
-parser.add_argument('--configs_filepath', type=Path, default='configs/convolutional_config.json',
+parser.add_argument('configs_filepath', type=Path, default='configs/convolutional_config.json',
                     required=False,
                     help='The config file to use. Default "configs/convolutional_config.json"')
 

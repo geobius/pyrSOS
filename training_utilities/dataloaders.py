@@ -38,7 +38,7 @@ The job of the dataloader is to find which patches overlap and load them as tens
 #root_folder = Path('/mnt/7EBA48EEBA48A48D/examhno10/ptyhiakh/pyrsos/patches128')
 #root2=Path('/mnt/7EBA48EEBA48A48D/examhno10/ptyhiakh/pyrsos/pyrsos_250cm_dataset')
 #configs1 = pyjson5.load(open('/mnt/7EBA48EEBA48A48D/examhno10/ptyhiakh/pyrsos/python_scripts/configs/common_config.json', 'r'))
-#configs2 = pyjson5.load(open('/mnt/7EBA48EEBA48A48D/examhno10/ptyhiakh/pyrsos/python_scripts/configs/convolutional_config.json', 'r'))
+configs2 = pyjson5.load(open('/mnt/7EBA48EEBA48A48D/examhno10/ptyhiakh/pyrsos/python_scripts/configs/convolutional_config_lma.json', 'r'))
 #configs3 = pyjson5.load(open('/mnt/7EBA48EEBA48A48D/examhno10/ptyhiakh/pyrsos/python_scripts/configs/pixel_config_lma.json', 'r'))
 
 
@@ -168,8 +168,11 @@ def retrieve_statistics_from_table(patch_name, band_indices, which_statistic, ta
     #while numpy uses 0 based indexing
 
     corrected_band_indices = [i-1 for i in band_indices]
-    whole_raster_name = patch_name2whole_name(patch_name)
-    all_patch_stats = table[whole_raster_name]
+    #whole_raster_name = patch_name2whole_name(patch_name)
+    patch_platform = extract_platform(patch_name)
+    patch_time = extract_time(patch_name)
+    source = f'{patch_platform}_{patch_time}'
+    all_patch_stats = table[source]
     values_for_all_bands = np.array(all_patch_stats[which_statistic])
     values_for_selected_bands = values_for_all_bands[corrected_band_indices]
     return values_for_selected_bands

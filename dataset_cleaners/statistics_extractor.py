@@ -6,17 +6,31 @@ import rasterio as rio
 import argparse
 from pathlib import Path
 
-#open an image
-#read the min,max, mean, stdev, normalizing constant
-#append the results in a file
+
+def image2tabular(image_array):
+    channels, height, width = image_array.shape
+    transposed = np.transpose(image_array, (1, 2, 0))
+    tabular_array = np.reshape(transposed, (height * width, channels))
+    return tabular_array
 
 
-def extract_stats(image_array):
-    min_values = np.min(image_array, axis=(1, 2)).tolist()
-    max_values = np.max(image_array, axis=(1, 2)).tolist()
-    mean_values = np.mean(image_array, axis=(1, 2)).tolist()
-    stdev_values = np.std(image_array, axis=(1, 2)).tolist()
-    normalizing_value = 255 if image_array.dtype == np.uint8 else 10000
+def load_images_as_tabular_array(filepaths):
+    tabular_chunks = []
+    for p in filepaths:
+        with rio.open(p) as ds:
+            image_array = ds.read()
+            tabular_chunks.append(image2tabular(image_array))
+
+    tabular_array = np.concatenate(tabular_chunks, 0)
+    return tabular_array
+
+
+def extract_stats(tabular_array, source):
+    min_values = np.min(tabular_array, axis=0).tolist()
+    max_values = np.max(tabular_array, axis=0).tolist()
+    mean_values = np.mean(tabular_array, axis=0).tolist()
+    stdev_values = np.std(tabular_array, axis=0).tolist()
+    normalizing_value = 255 if source == 'lma_post' else 10000
 
     stats_dictionary = {
         'global_minima': min_values,
@@ -30,25 +44,29 @@ def extract_stats(image_array):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=
-                                     'dump the minimum,maximum,mean,standard deviation and normalizing constant values across each band of a raster into a json file')
+                                     'dump the minimum,maximum,mean,standard deviation and normalizing constant values across each band of the training set into a json file')
     
     parser.add_argument('dataset_folder', type=Path)
+    parser.add_argument('event_split_filepath', type=Path)
     args = parser.parse_args()
 
     stats_table = {}
+    events_split = json.load(open(args.event_split_filepath, 'r'))
+    train_events = events_split['training_set']
+    train_folderpaths = [args.dataset_folder/x for x in train_events]
 
-    all_events = [folder.stem for folder in args.dataset_folder.iterdir() if folder.is_dir()]
-    for event in all_events:
-        source_folder = args.dataset_folder/event
-        event_files = source_folder.glob('*multiband.tif')
-        for current_file in event_files:
-            with rio.open(current_file) as ds:
-                image_name = current_file.stem
-                bands = ds.read()
-                stats = extract_stats(bands)
-                new_entry = {image_name: stats}
-                stats_table.update(new_entry)
+    train_filepaths = []
+    for current_folder in train_folderpaths:
+        train_filepaths.extend(list(current_folder.glob('*multiband.tif')))
 
+    sources = ['lma_post', 'sen2_pre', 'sen2_post']
+    for source in sources:
+        source_filepaths = [path for path in train_filepaths if source in path.stem]
+        source_tabular = load_images_as_tabular_array(source_filepaths)
+        source_stats = extract_stats(source_tabular, source)
+
+        new_entry = {source: source_stats}
+        stats_table.update(new_entry)
 
     with open(args.dataset_folder/'stats_logger.json', 'w') as log:
         json.dump(stats_table, log)
