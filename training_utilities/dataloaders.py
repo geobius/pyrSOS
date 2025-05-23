@@ -12,6 +12,7 @@ from sklearn.decomposition import PCA
 
 import torchvision.transforms as T
 import torchvision.transforms.functional as TF
+from torchvision.transforms.functional import InterpolationMode
 
 
 # Seed stuff
@@ -38,7 +39,7 @@ The job of the dataloader is to find which patches overlap and load them as tens
 #root_folder = Path('/mnt/7EBA48EEBA48A48D/examhno10/ptyhiakh/pyrsos/patches128')
 #root2=Path('/mnt/7EBA48EEBA48A48D/examhno10/ptyhiakh/pyrsos/pyrsos_250cm_dataset')
 #configs1 = pyjson5.load(open('/mnt/7EBA48EEBA48A48D/examhno10/ptyhiakh/pyrsos/python_scripts/configs/common_config.json', 'r'))
-configs2 = pyjson5.load(open('/mnt/7EBA48EEBA48A48D/examhno10/ptyhiakh/pyrsos/python_scripts/configs/convolutional_config_lma.json', 'r'))
+#configs2 = pyjson5.load(open('/mnt/7EBA48EEBA48A48D/examhno10/ptyhiakh/pyrsos/python_scripts/configs/convolutional_config_lma.json', 'r'))
 #configs3 = pyjson5.load(open('/mnt/7EBA48EEBA48A48D/examhno10/ptyhiakh/pyrsos/python_scripts/configs/pixel_config_lma.json', 'r'))
 
 
@@ -144,7 +145,8 @@ def augment(pre_patch, post_patch, label_patch):
         angle = random.uniform(-5, 5)
         pre_aug = TF.rotate(pre_aug, angle=angle)
         post_aug = TF.rotate(post_aug, angle=angle)
-        label_aug = TF.rotate(label_aug.unsqueeze(0), angle=angle).squeeze()
+        label_aug = TF.rotate(label_aug.unsqueeze(0), angle=angle, interpolation=InterpolationMode.NEAREST).squeeze(0)
+        #the default interpolation causes my label to have continuous values and I don't want this.
 
     return pre_aug, post_aug, label_aug
 
@@ -185,7 +187,7 @@ def scale_patch(image_array, patch_name, band_indices, stats_table, scaling_meth
             case 'standardization':
                 global_means =  retrieve_statistics_from_table(patch_name, band_indices, 'global_mean', stats_table)[:, np.newaxis, np.newaxis]
                 global_stdevs = retrieve_statistics_from_table(patch_name, band_indices, 'global_stdev', stats_table)[:, np.newaxis, np.newaxis]
-                standardized_image = (image_array - global_means) / global_stdevs # this is a mistake. the array dimensions do not match (3,128,128) vs (3,)
+                standardized_image = (image_array - global_means) / global_stdevs 
                 return standardized_image
 
             case 'minmax':
@@ -303,12 +305,11 @@ class Pyrsos_Dataset(Dataset):
 
         # the patches are configured in such a way that they geographically overlap pixel by pixel
 
-        #the scale_patch method needs fixing
         pre_patch = scale_patch(pre_patch, pre_name, pre_indices, self.statistics_table, self.configs['pre_scale_input_method'])
         post_patch = scale_patch(post_patch, post_name, post_indices, self.statistics_table, self.configs['post_scale_input_method'])
 
-        pre_patch = torch.from_numpy(post_patch)
-        post_patch = torch.from_numpy(post_patch)
+        pre_patch = torch.from_numpy(pre_patch).to(dtype=torch.float32)
+        post_patch = torch.from_numpy(post_patch).to(dtype=torch.float32)
         label_patch = torch.from_numpy(label_patch).to(dtype=torch.int64)
 
         if self.configs['augment?'] and self.which_set == 'training set':

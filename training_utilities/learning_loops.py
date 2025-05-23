@@ -42,8 +42,8 @@ def train1epoch(model, train_dataloader, loss_function, optimizer, scheduler, de
     metrics = make_metrics_table().to(device=device)
 
     for (pre_images, post_images, labels) in tqdm(train_dataloader):
-        pre_images = pre_images.to(device=device, dtype=torch.float32)
-        post_images = post_images.to(device=device, dtype=torch.float32)
+        pre_images = pre_images.to(device=device)
+        post_images = post_images.to(device=device)
         labels = labels.to(device=device)
 
         optimizer.zero_grad()
@@ -73,8 +73,8 @@ def eval1epoch(model, dataloader, loss_function, device):
     metrics = make_metrics_table().to(device=device)
     with torch.no_grad():
         for (pre_images, post_images, labels) in tqdm(dataloader):
-            pre_images = pre_images.to(device=device, dtype=torch.float32)
-            post_images = post_images.to(device=device, dtype=torch.float32)
+            pre_images = pre_images.to(device=device)
+            post_images = post_images.to(device=device)
             labels = labels.to(device=device)
 
             logit_outputs = model(pre_images, post_images)

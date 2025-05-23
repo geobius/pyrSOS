@@ -25,6 +25,11 @@ def load_images_as_tabular_array(filepaths):
     return tabular_array
 
 
+def remove_zero_entries(tabular_array):
+    mask = ~(tabular_array == 0).all(axis=1)
+    filtered_tabular_array = tabular_array[mask]
+    return filtered_tabular_array
+
 def extract_stats(tabular_array, source):
     min_values = np.min(tabular_array, axis=0).tolist()
     max_values = np.max(tabular_array, axis=0).tolist()
@@ -63,7 +68,8 @@ if __name__ == '__main__':
     for source in sources:
         source_filepaths = [path for path in train_filepaths if source in path.stem]
         source_tabular = load_images_as_tabular_array(source_filepaths)
-        source_stats = extract_stats(source_tabular, source)
+        filtered_tabular = remove_zero_entries(source_tabular)
+        source_stats = extract_stats(filtered_tabular, source)
 
         new_entry = {source: source_stats}
         stats_table.update(new_entry)

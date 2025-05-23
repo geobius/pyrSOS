@@ -11,7 +11,15 @@ import pyjson5
 from pathlib import Path
 
 
-
+def plot_relu():
+    x = np.arange(-10, 10, 0.01)
+    y = np.maximum(np.zeros(x.shape), x)
+    plt.plot(x, y)
+    plt.title("Relu Activation Function")
+    plt.xlabel("x")
+    plt.ylabel("y")
+    plt.show()
+    return
 
 
 def plot_logit():

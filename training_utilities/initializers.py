@@ -27,12 +27,12 @@ from losses.bce_and_dice import BCEandDiceLoss
 
 from training_utilities.dataloaders import Burned_Area_Sampler
 
-def save_checkpoint(checkpoint_path, loss, model, optimizer, lr_scheduler):
+def save_checkpoint(checkpoint_path, loss, model_dictionary, optimizer_dictionary, lr_scheduler_dictionary):
 
     torch.save({
-        'model_state_dict': model.state_dict(),
-        'optimizer_state_dict': optimizer.state_dict(),
-        'lr_scheduler_state_dict': lr_scheduler.state_dict(),
+        'model_state_dict': model_dictionary,
+        'optimizer_state_dict': optimizer_dictionary,
+        'lr_scheduler_state_dict': lr_scheduler_dictionary,
         'loss': loss},
                checkpoint_path)
 

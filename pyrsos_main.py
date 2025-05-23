@@ -4,7 +4,7 @@
 This script is used to train a model on the given data. The user must
 specify the necessary data paths, the model and its hyperparameters.
 '''
-
+import copy
 import argparse
 from os.path import exists
 from pathlib import Path
@@ -47,7 +47,6 @@ from training_utilities.prediction_visualization import convolutional_visualizer
 parser = argparse.ArgumentParser()
 
 parser.add_argument('configs_filepath', type=Path, default='configs/convolutional_config.json',
-                    required=False,
                     help='The config file to use. Default "configs/convolutional_config.json"')
 
 args = parser.parse_args()
@@ -78,7 +77,7 @@ test_dataset = Pyrsos_Dataset('testing_set', configs)
 
 if configs['learning_stage'] == 'train':
     train_loader = init_train_loader(train_dataset, configs)
-    val_loader = DataLoader(val_dataset, num_workers=configs['#workers'], batch_size=configs['batch_size'], shuffle=True, pin_memory=True)
+    val_loader = DataLoader(val_dataset, num_workers=configs['#workers'], batch_size=configs['batch_size'], shuffle=False, pin_memory=True)
 
     print(f'{font_colors.CYAN}Using {configs["loss_function"]} with class weights: {class_weights["training_set"]}.{font_colors.ENDC}')
 
@@ -90,6 +89,8 @@ if configs['learning_stage'] == 'train':
     wandb = init_wandb(configs, model_configs)
 
     best_model = {}
+    best_scheduler = {}
+    best_optimizer = {}
     best_f1_score = 0.0 #in percentage
     best_epoch = 0
 
@@ -110,12 +111,14 @@ if configs['learning_stage'] == 'train':
         f1_score = val_metrics['f1'].item()*100 #in percentage
         if f1_score > best_f1_score:
             best_f1_score = f1_score
-            best_model = model
+            best_model = copy.deepcopy(model.state_dict())
+            best_scheduler = copy.deepcopy(lr_scheduler.state_dict())
+            best_optimizer = copy.deepcopy(optimizer.state_dict())
             best_epoch = epoch
 
         if (save_every > 0 and epoch % save_every == 0) or (epoch == last_epoch - 1):
             new_checkpoint_path = save_folder / f'best_epoch={best_epoch}.pt'
-            save_checkpoint(new_checkpoint_path, val_loss, best_model, optimizer, lr_scheduler)
+            save_checkpoint(new_checkpoint_path, val_loss, best_model, best_optimizer, best_scheduler)
 
 
 
@@ -124,8 +127,8 @@ if configs['learning_stage'] == 'eval':
     #Now we are checking the metrics across every set to log them in my technical essay.
     #and visualizing the model output masks
     train_loader = init_train_loader(train_dataset, configs)
-    val_loader = DataLoader(val_dataset, num_workers=configs['#workers'], batch_size=configs['batch_size'], shuffle=True, pin_memory=True)
-    test_loader = DataLoader(test_dataset, num_workers=configs['#workers'], batch_size=configs['batch_size'], shuffle=True, pin_memory=True)
+    val_loader = DataLoader(val_dataset, num_workers=configs['#workers'], batch_size=configs['batch_size'], shuffle=False, pin_memory=True)
+    test_loader = DataLoader(test_dataset, num_workers=configs['#workers'], batch_size=configs['batch_size'], shuffle=False, pin_memory=True)
 
     train_criterion = init_loss(loss_function_name, class_weights['training_set'], model_configs).to(device=configs['device'])
     val_criterion = init_loss(loss_function_name, class_weights['validation_set'], model_configs).to(device=configs['device'])
