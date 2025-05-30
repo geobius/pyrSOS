@@ -41,7 +41,7 @@ The job of the dataloader is to find which patches overlap and load them as tens
 #configs1 = pyjson5.load(open('/mnt/7EBA48EEBA48A48D/examhno10/ptyhiakh/pyrsos/python_scripts/configs/common_config.json', 'r'))
 #configs2 = pyjson5.load(open('/mnt/7EBA48EEBA48A48D/examhno10/ptyhiakh/pyrsos/python_scripts/configs/convolutional_config_lma.json', 'r'))
 #configs3 = pyjson5.load(open('/mnt/7EBA48EEBA48A48D/examhno10/ptyhiakh/pyrsos/python_scripts/configs/pixel_config_lma.json', 'r'))
-
+#test_label = Path('/mnt/7EBA48EEBA48A48D/examhno10/ptyhiakh/pyrsos/pyrsos_250cm_dataset_alt/northprodromos/northprodromos_lma_post_250cm_label.tif')
 
 def extract_area(image_name):
     return image_name.split('_')[0]
@@ -205,6 +205,30 @@ def scale_patch(image_array, patch_name, band_indices, stats_table, scaling_meth
             case None:
                 return image_array
 
+def scale_tabular_array(image_array, patch_name, band_indices, stats_table, scaling_method): #We need information from the whole raster.
+        match scaling_method:
+            case 'standardization':
+                global_means =  retrieve_statistics_from_table(patch_name, band_indices, 'global_mean', stats_table)
+                global_stdevs = retrieve_statistics_from_table(patch_name, band_indices, 'global_stdev', stats_table)
+                standardized_image = (image_array - global_means) / global_stdevs 
+                return standardized_image
+
+            case 'minmax':
+                global_min =  retrieve_statistics_from_table(patch_name, band_indices, 'global_minima', stats_table)
+                global_max =  retrieve_statistics_from_table(patch_name, band_indices, 'global_maxima', stats_table)
+                minmax_image = (image_array - global_min) / (global_max - global_min)
+                return minmax_image
+            
+            case 'reflectance':
+                division_factors = {'sen2': 10000, 'lma' : 255}
+                additive_offsets = {'sen2': -1000, 'lma': 0} #this is essential for sen2 images past january 2022
+                platform = extract_platform(patch_name)
+                reflectance_image = np.maximum(0, (image_array + additive_offsets[platform]) / division_factors[platform])
+                return reflectance_image
+            case None:
+                return image_array
+
+            
 
 def fuse_arrays(pre, post, fusion_method):
     match fusion_method:
@@ -216,6 +240,23 @@ def fuse_arrays(pre, post, fusion_method):
             return np.concatenate([pre, post], axis=1)
 
     return
+
+
+
+
+def load_single_image_as_tabular_array(image_path, selected_bands, scale_input_method, stats_table={}):
+    with rio.open(image_path) as ds:
+        name = image_path.stem
+        image_array = ds.read(indexes=selected_bands)
+        image_array = image2tabular(image_array)
+        
+        scaled_tabular_array = scale_tabular_array(image_array, name, selected_bands, stats_table, scale_input_method)
+        zero_mask = ~np.all(image_array == 0, axis=1)
+
+    #zero mask keeps in memory which entries have value [0,0,0]
+    return scaled_tabular_array, zero_mask
+
+
 
 def load_dataset_as_table(which_set, configs):
     
@@ -232,34 +273,34 @@ def load_dataset_as_table(which_set, configs):
 
     pre_tabular = []
     post_tabular = []
+    zero_mask_tabular = []
     label_tabular = []
 
     for p in pre_images_paths:
-        with rio.open(p) as pre_ds:
-            pre_name = p.stem
-            image_array = pre_ds.read(indexes=configs['pre_selected_bands'])
-            image_array = scale_patch(image_array, pre_name, configs['pre_selected_bands'], stats_table, configs['pre_scale_input_method'])
-            image_array = image2tabular(image_array)
-            pre_tabular.append(image_array)
+        tabular_array, _ = load_single_image_as_tabular_array(p, configs['pre_selected_bands'], configs['pre_scale_input_method'], stats_table)
+        pre_tabular.append(tabular_array)
 
     for p in post_images_paths:
-        with rio.open(p) as post_ds:
-            post_name = p.stem
-            image_array = post_ds.read(indexes=configs['post_selected_bands'])
-            image_array = scale_patch(image_array, post_name, configs['post_selected_bands'], stats_table, configs['post_scale_input_method'])
-            image_array = image2tabular(image_array)
-            post_tabular.append(image_array)
-
+        tabular_array, zero_mask = load_single_image_as_tabular_array(p, configs['post_selected_bands'], configs['post_scale_input_method'], stats_table)
+        post_tabular.append(tabular_array)
+        zero_mask_tabular.append(zero_mask)
 
     for p in label_images_paths:
-        with rio.open(p) as label_ds:
-            image_array = label_ds.read()
-            image_array = image2tabular(image_array)
-            label_tabular.append(image_array)
+        tabular_array, _ = load_single_image_as_tabular_array(p, [1] , None)
+        label_tabular.append(tabular_array)
 
-    pre_total = np.concatenate(pre_tabular, 0)
-    post_total = np.concatenate(post_tabular, 0)
-    label_total = np.concatenate(label_tabular, 0).flatten()
+        #you need to remove void entries from the training set. They are too many and they worsen any model's performance
+
+    if which_set == 'training_set':
+        for idx, mask in enumerate(zero_mask_tabular):
+            pre_tabular[idx] = (pre_tabular[idx])[mask]
+            post_tabular[idx] = (post_tabular[idx])[mask]
+            label_tabular[idx] = (label_tabular[idx])[mask]
+
+
+    pre_total = np.concatenate(pre_tabular, axis=0)
+    post_total = np.concatenate(post_tabular, axis=0)
+    label_total = np.concatenate(label_tabular, axis=0).flatten()
 
     fused_array = fuse_arrays(pre_total, post_total, configs['fusion_method'])
 

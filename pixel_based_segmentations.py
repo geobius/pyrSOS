@@ -49,7 +49,7 @@ def make_balanced_subset(x, y, size, seed):
     return subset_x_balanced, subset_y_balanced
 
 
-pixel_configs = pyjson5.load(open(Path('/mnt/7EBA48EEBA48A48D/examhno10/ptyhiakh/pyrsos/python_scripts/configs/pixel_config_sen2.json')))
+pixel_configs = pyjson5.load(open(Path('/mnt/7EBA48EEBA48A48D/examhno10/ptyhiakh/pyrsos/python_scripts/configs/pixel_config_lma.json')))
 
 x_train, y_train = load_dataset_as_table('training_set', pixel_configs)
 x_val, y_val = load_dataset_as_table('validation_set', pixel_configs)
@@ -193,12 +193,12 @@ def run(model_name):
     return trained_model
 
 
-#trained_model = run('log')
+trained_model = run('log')
 #trained_model = run('svm')
 #trained_model = run('tree')
 #trained_model = run('forest')
 #trained_model = run('xgb')
-trained_model = run('allburnt')
+#trained_model = run('allburnt')
 #trained_model = run('rectangle')
 
 #vis = pixel_visualizer(trained_model, pixel_configs)

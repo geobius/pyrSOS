@@ -1,0 +1,48 @@
+{
+    "model": "unet",
+    "learning_stage": "train",//train or eval
+    "#workers": 6,
+    "seed": 999,
+    "device": "cuda",
+    "batch_size": 15,
+
+    "#epochs": 50,
+    "save_every_n_epochs": -1,
+    "loss_function": "cross_entropy",
+    "weighted_loss?": true,
+    "augment?": true,
+    "use_only_burned_patches?": false,
+    "visualization_set": "testing_set",
+
+    "wandb_project": "unet",
+    "wandb_entity": "",
+    "wandb_id": "",
+    "wandb_resume?": true,
+    "wandb_activate?":true,
+
+    "dataset_folderpath": "/mnt/nvme1/armakolas/patches128_overlap",
+    "patches_folderpath": "/mnt/nvme1/armakolas/patches128_overlap", //only for visualization purposes
+    "save_state_folderpath": "/mnt/nvme1/armakolas/results/unet/lma_overlap_depth4_raw",
+    "load_state_filepath": "/mnt/nvme1/armakolas/results/unet/floga_depth4/checkpoints/0/best_epoch=138.pt",
+    "split_filepath": "/mnt/nvme1/armakolas/patches128_overlap/event_splits_v1.json",
+    "stats_filepath": "/mnt/nvme1/armakolas/patches128_overlap/stats_logger.json",
+    "specific_hyperparameters_filepath": "/mnt/nvme1/armakolas/code_pyrsos/configs/method/unet3.json",
+
+    "patch_width": 128,
+    "patch_height": 128,
+    "fusion_method": "only_post_image", //available options are only_post_image, difference, concatenation. This config is valid only for pixel based methods and is ignored for convolutional models
+
+    "pre_data_source": "sen2", //only option
+    "pre_scale_input_method": "standardization",  //available options are standardization, reflectance, minmax, None
+    "pre_gsd": "250cm",
+    "pre_selected_bands": [3,4,7], //1 based indexing
+
+    "post_data_source": "lma", //lma or sen2
+    "post_scale_input_method": null,  //available options are standardization, reflectance, minmax, None
+    "post_gsd": "250cm",
+    "post_selected_bands": [1,2,4] //1-based indexing
+}
+
+//patches_folderpath is distinct from dataset_folderpath because it was faster for the pixel methods to load the entire image at once during training
+
+

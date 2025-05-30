@@ -47,7 +47,7 @@ class visualizer():
             pre_patch = pre_ds.read(indexes=pre_indices)
 
         if self.configs['pre_data_source'] == 'sen2':
-            pre_patch = (np.floor(pre_patch*(255/10000))).astype(np.uint8)
+            pre_patch = (pre_patch*(255/pre_patch.max())).astype(np.uint8)
         pre_patch = np.transpose(pre_patch,(1, 2, 0))[:, :, [2, 1, 0]]
          
         post_path = self.post_patches_paths[self.index]
@@ -56,7 +56,7 @@ class visualizer():
             post_patch = post_ds.read(indexes=post_indices)
 
         if self.configs['post_data_source'] == 'sen2':
-            post_patch = (np.floor(post_patch*(255/10000))).astype(np.uint8)
+            post_patch = (post_patch*(255/post_patch.max())).astype(np.uint8)
         post_patch = np.transpose(post_patch,(1, 2, 0))[:, :, [2, 1, 0]]
 
         label_path = self.label_patches_paths[self.index]

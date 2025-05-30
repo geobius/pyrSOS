@@ -8,21 +8,24 @@ from itertools import combinations
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 
-common_folder = Path('/mnt/7EBA48EEBA48A48D/examhno10/ptyhiakh/pyrsos/pyrsos_250cm_dataset')
+common_folder = Path('/mnt/7EBA48EEBA48A48D/examhno10/ptyhiakh/pyrsos/pyrsos_250cm_dataset_alt')
 """
 test1 = common_folder / 'delphoi_lma_post_250cm_multiband.tif'
 test1_label = common_folder / 'delphoi_lma_post_250cm_label.tif'
 
-test2 = common_folder / 'prodromos_lma_post_250cm_multiband.tif'
-test2_label = common_folder / 'prodromos_lma_post_250cm_label.tif'
+test2 = common_folder / 'northprodromos_lma_post_250cm_multiband.tif'
+test2_label = common_folder / 'northprodromos_lma_post_250cm_label.tif'
 
-test3 = common_folder / 'yliki_lma_post_250cm_multiband.tif'
-test3_label = common_folder / 'yliki_lma_post_250cm_label.tif'
+test3 = common_folder / 'prodromos_lma_post_250cm_multiband.tif'
+test3_label = common_folder / 'prodromos_lma_post_250cm_label.tif'
 
-test4 = common_folder / 'domokos_lma_post_250cm_multiband.tif'
-test4_label = common_folder / 'domokos_lma_post_250cm_label.tif'
+test4 = common_folder / 'yliki_lma_post_250cm_multiband.tif'
+test4_label = common_folder / 'yliki_lma_post_250cm_label.tif'
+
+test5 = common_folder / 'domokos_lma_post_250cm_multiband.tif'
+test5_label = common_folder / 'domokos_lma_post_250cm_label.tif'
+
 """
-
 
 
 def histogram_burnt(common_folder, area):
@@ -39,11 +42,11 @@ def histogram_burnt(common_folder, area):
 
     fig, axes = plt.subplots(1, 4, figsize=(20, 5))
     colors = ['green', 'red', 'brown', 'purple']
-    xlabels = ['green', 'red', 'red edge', 'near infared']
+    xlabels = ['green', 'red', 'red edge', 'near infrared']
     fig.suptitle(f"{area} Burnt Histograms per channel")
 
     for i in range(4):
-        axes[i].hist(burnt_subset[i, :], bins=256, density=True, color=colors[i])
+        axes[i].hist(burnt_subset[i, :], bins=256, density=True, range=(0, 255), color=colors[i], align='left')
         axes[i].set_xlabel(xlabels[i])
         axes[i].set_ylabel("density")
 
@@ -61,18 +64,20 @@ def histogram_all_classes(common_folder, area):
     with rio.open(lma_path) as multiband_ds:
         area_image = multiband_ds.read()
     with rio.open(mask_path) as mask_ds:
-        area_mask = mask_ds.read(1)
-    burnt_subset = area_image[:, area_mask == 1]
-    unburnt_subset = area_image[:, area_mask == 0]
+        area_mask = (mask_ds.read(1)).astype(bool)
+    burnt_subset = area_image[:, area_mask]
+    unburnt_subset = area_image[:, ~area_mask]
 
+    all_zero_mask = ~(np.all(unburnt_subset == 0, axis=0))
+    unburnt_subset_no_zeroes = unburnt_subset[:, all_zero_mask]
 
     fig, axes = plt.subplots(1, 4, figsize=(20, 5))
-    xlabels = ['green', 'red', 'red edge', 'near infared']
+    xlabels = ['green', 'red', 'red edge', 'near infrared']
     fig.suptitle(f"{area} All classes")
 
     for i in range(4):
-        burnt_hist, bins = np.histogram(burnt_subset[i, :], bins=256, density=True)
-        unburnt_hist, _ = np.histogram(unburnt_subset[i, :], bins=256, density=True)
+        burnt_hist, bins = np.histogram(burnt_subset[i, :], bins=256, range=(0,255), density=True)
+        unburnt_hist, _ = np.histogram(unburnt_subset_no_zeroes[i, :], bins=256, range=(0,255), density=True)
 
         overlap = np.minimum(burnt_hist, unburnt_hist)
         burnt_remaining = burnt_hist - overlap
@@ -80,7 +85,7 @@ def histogram_all_classes(common_folder, area):
 
         axes[i].bar(bins[:-1], overlap, width=1, color='yellow', label='overlap area')
         axes[i].bar(bins[:-1], burnt_remaining, width=1, bottom=overlap, color='red', label='burnt only')
-        axes[i].bar(bins[1:-1], unburnt_remaining[1:], width=1, bottom=overlap[1:,], color='blue', label='unburnt only')
+        axes[i].bar(bins[:-1], unburnt_remaining, width=1, bottom=overlap, color='blue', label='unburnt only')
 
         axes[i].set_xlabel(xlabels[i])
         axes[i].set_ylabel("density")
@@ -147,7 +152,7 @@ def scatterplot_burnt(common_folder, area):
 
     fig, axes = plt.subplots(2, 3)
     axes = axes.ravel()
-    labels = ['Green', 'Red', 'Red Edge', 'Near Infared']
+    labels = ['Green', 'Red', 'Red Edge', 'Near Infrared']
     fig.suptitle(f"{area} Scatterplots between channels for burnt pixels")
 
     np.random.seed(103)

@@ -1,32 +1,32 @@
 {
-    "model": "unet",
-    "learning_stage": "eval",//train or eval
+    "model": "bam_cd",
+    "learning_stage": "train",//train or eval
     "#workers": 6,
     "seed": 999,
     "device": "cuda",
-    "batch_size": 15,
+    "batch_size": 30,
 
     "#epochs": 50,
     "save_every_n_epochs": -1,
     "loss_function": "cross_entropy",
     "weighted_loss?": true,
-    "augment?": true,
+    "augment?": false,
     "use_only_burned_patches?": false,
-    "visualization_set": "training_set",
+    "visualization_set": "testing_set",
 
-    "wandb_project": "unet",
+    "wandb_project": "bamcd",
     "wandb_entity": "",
     "wandb_id": "",
-    "wandb_resume?": false,
-    "wandb_activate?":false,
+    "wandb_resume?": true,
+    "wandb_activate?":true,
 
-    "dataset_folderpath": "/mnt/7EBA48EEBA48A48D/examhno10/ptyhiakh/pyrsos/patches128_alt",
-    "patches_folderpath": "/mnt/7EBA48EEBA48A48D/examhno10/ptyhiakh/pyrsos/patches128_alt", //only for visualization purposes
-    "save_state_folderpath": "/mnt/7EBA48EEBA48A48D/examhno10/ptyhiakh/pyrsos/diagrams/unet/depth_lma/training_set",
-    "load_state_filepath": "/mnt/7EBA48EEBA48A48D/examhno10/ptyhiakh/pyrsos/results/unet/depth2/best_epoch=177.pt",
-    "split_filepath": "/mnt/7EBA48EEBA48A48D/examhno10/ptyhiakh/pyrsos/patches128_alt/event_splits_v1.json",
-    "stats_filepath": "/mnt/7EBA48EEBA48A48D/examhno10/ptyhiakh/pyrsos/patches128_alt/stats_logger.json",
-    "specific_hyperparameters_filepath": "/mnt/7EBA48EEBA48A48D/examhno10/ptyhiakh/pyrsos/python_scripts/configs/method/unet1.json",
+    "dataset_folderpath": "/mnt/nvme1/armakolas/patches128_no_overlap",
+    "patches_folderpath": "/mnt/nvme1/armakolas/patches128_no_overlap", //only for visualization purposes
+    "save_state_folderpath": "/mnt/nvme1/armakolas/results/bam_cd/lma_resnet50_no_overlap",
+    "load_state_filepath": "/mnt/nvme1/armakolas/results/bam_cd/floga_resnet50/checkpoints/0/best_epoch=53.pt",
+    "split_filepath": "/mnt/nvme1/armakolas/patches128_no_overlap/event_splits_v1.json",
+    "stats_filepath": "/mnt/nvme1/armakolas/patches128_no_overlap/stats_logger.json",
+    "specific_hyperparameters_filepath": "/mnt/nvme1/armakolas/code_pyrsos/configs/method/bam_cd3.json",
 
     "patch_width": 128,
     "patch_height": 128,

@@ -1,0 +1,11 @@
+{
+    "method": "unet",
+    "depth" : 3,
+    "fusion_method" : "only_post_image", //it can be only_post_image, concatenation, difference
+    "optimizer": {
+        "name": "adamw",
+        "learning_rate": 1e-5,
+        "weight_decay": 0,  // 1e-4
+        "lr_schedule": null
+    }
+}

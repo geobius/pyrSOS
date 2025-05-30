@@ -1,6 +1,6 @@
 {
     "model": "unet",
-    "learning_stage": "eval",//train or eval
+    "learning_stage": "train",//train or eval
     "#workers": 6,
     "seed": 999,
     "device": "cuda",
@@ -10,23 +10,23 @@
     "save_every_n_epochs": -1,
     "loss_function": "cross_entropy",
     "weighted_loss?": true,
-    "augment?": true,
+    "augment?": false,
     "use_only_burned_patches?": false,
     "visualization_set": "testing_set",
 
     "wandb_project": "unet",
     "wandb_entity": "",
     "wandb_id": "",
-    "wandb_resume?": false,
-    "wandb_activate?":false,
+    "wandb_resume?": true,
+    "wandb_activate?":true,
 
-    "dataset_folderpath": "/mnt/nvme1/armakolas/patches128_alt",
-    "patches_folderpath": "/mnt/nvme1/armakolas/patches128_alt", //only for visualization purposes
-    "save_state_folderpath": "/mnt/nvme1/armakolas/results/unet/pyrsos_depth4",
-    "load_state_filepath": "/mnt/nvme1/armakolas/results/unet/pyrsos_depth4/best_epoch=168.pt",
-    "split_filepath": "/mnt/nvme1/armakolas/patches128_alt/event_splits_v1.json",
-    "stats_filepath": "/mnt/nvme1/armakolas/patches128_alt/stats_logger.json",
-    "specific_hyperparameters_filepath": "/mnt/nvme1/armakolas/code_pyrsos/configs/method/unet3.json",
+    "dataset_folderpath": "/mnt/nvme1/armakolas/patches128_no_overlap",
+    "patches_folderpath": "/mnt/nvme1/armakolas/patches128_no_overlap", //only for visualization purposes
+    "save_state_folderpath": "/mnt/nvme1/armakolas/results/unet/lma_withoutoverlap_depth3_raw",
+    "load_state_filepath": "/mnt/nvme1/armakolas/results/unet/floga_depth3/checkpoints/0/best_epoch=130.pt",
+    "split_filepath": "/mnt/nvme1/armakolas/patches128_no_overlap/event_splits_v1.json",
+    "stats_filepath": "/mnt/nvme1/armakolas/patches128_no_overlap/stats_logger.json",
+    "specific_hyperparameters_filepath": "/mnt/nvme1/armakolas/code_pyrsos/configs/method/unet2.json",
 
     "patch_width": 128,
     "patch_height": 128,
@@ -38,7 +38,7 @@
     "pre_selected_bands": [3,4,7], //1 based indexing
 
     "post_data_source": "lma", //lma or sen2
-    "post_scale_input_method": "standardization",  //available options are standardization, reflectance, minmax, None
+    "post_scale_input_method": null,  //available options are standardization, reflectance, minmax, None
     "post_gsd": "250cm",
     "post_selected_bands": [1,2,4] //1-based indexing
 }
